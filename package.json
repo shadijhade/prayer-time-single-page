@@ -1,0 +1,25 @@
+{
+  "name": "prayer-time-single-page",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shadijhade/prayer-time-single-page.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shadijhade/prayer-time-single-page/issues"
+  },
+  "homepage": "https://github.com/shadijhade/prayer-time-single-page#readme",
+  "description": "",
+  "devDependencies": {
+    "csso-cli": "^4.0.2",
+    "html-minifier-terser": "^7.2.0",
+    "terser": "^5.39.0"
+  }
+}

@@ -1,0 +1,90 @@
+name: Minify Assets
+
+on:
+  push:
+    branches:
+      - main # Trigger only on pushes to the main branch
+      # Add other branches like 'develop' if needed:
+      # - develop
+
+jobs:
+  build:
+    name: Build and Minify
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Checks out your repository's code
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Specify your desired Node.js version
+          cache: 'npm' # Enable caching for npm dependencies
+
+      - name: Install Dependencies
+        run: npm ci # Use 'ci' for faster, reliable installs in CI environments
+
+      - name: Create Output Directory
+        run: mkdir -p dist # Create a directory to store minified files
+
+      - name: Minify HTML files
+        run: |
+          # Find all HTML files, excluding node_modules and the output dir itself
+          # Minify each file and output to the 'dist' directory, preserving structure
+          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.html" -print | while read file; do
+            output_file="dist/${file#./}" # Calculate output path relative to dist
+            mkdir -p "$(dirname "$output_file")" # Ensure directory exists in dist
+            npx html-minifier-terser "$file" \
+              --collapse-whitespace \
+              --remove-comments \
+              --remove-optional-tags \
+              --remove-redundant-attributes \
+              --remove-script-type-attributes \
+              --remove-tag-whitespace \
+              --use-short-doctype \
+              --minify-css true \
+              --minify-js true \
+              -o "$output_file"
+            echo "Minified $file to $output_file"
+          done
+
+      - name: Minify CSS files
+        run: |
+          # Find all CSS files, excluding node_modules and dist
+          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.css" -print | while read file; do
+            output_file="dist/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            npx csso "$file" -o "$output_file"
+            echo "Minified $file to $output_file"
+          done
+
+      - name: Minify JavaScript files
+        run: |
+          # Find all JS files, excluding node_modules and dist
+          # Skip adhan.umd.js as it's likely already minified
+          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.js" -not -name "adhan.umd.js" -print | while read file; do
+            output_file="dist/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            npx terser "$file" --compress --mangle -o "$output_file"
+            echo "Minified $file to $output_file"
+          done
+          # Copy files that were not minified (like adhan.umd.js) to dist
+          echo "Copying adhan.umd.js to dist/"
+          cp adhan.umd.js dist/adhan.umd.js || echo "Warning: adhan.umd.js not found at root."
+
+      - name: Copy Other Essential Files (Manifest, Icons etc.)
+        run: |
+           echo "Copying manifest and essential assets..."
+           cp manifest.json dist/manifest.json || echo "Warning: manifest.json not found."
+           cp favicon.* dist/ 2>/dev/null || echo "Warning: Favicon files not found."
+           cp *.png dist/ 2>/dev/null || echo "Warning: PNG files not found."
+           # Add any other files/directories needed for deployment
+           # Example: cp -r images dist/
+
+      - name: Upload Minified Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prayer-times-dist # Name of the artifact zip file
+          path: dist/ # Upload the entire 'dist' directory
+          if-no-files-found: error # Fail the step if the dist directory is empty
