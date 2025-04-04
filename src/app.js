@@ -27,7 +27,7 @@
   // --- API & Paths ---
   const REVERSE_GEOCODE_URL =
     "https://api.bigdatacloud.net/data/reverse-geocode-client";
-  const SERVICE_WORKER_PATH = "/sw.js"; // Ensure this path is correct
+  const SERVICE_WORKER_PATH = "sw.js"; // Ensure this path is correct
 
   // --- Caching ---
   const LOCATION_CACHE_PRECISION = 3; // Decimal places for lat/lon rounding (approx 111m)
@@ -56,7 +56,7 @@
   const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`; // Match button icon
 
   // --- Notification Constants ---
-  const NOTIFICATION_ICON_PATH = "/android-chrome-192x192.png"; // Match SW
+  const NOTIFICATION_ICON_PATH = "/web-app-manifest-192x192.png"; // Match SW
   const PRE_NOTIFICATION_MINUTES = 10;
   const PRAYER_NOTIFICATION_TAG_PREFIX = "prayer-";
 
@@ -1018,15 +1018,15 @@
         resetForecastViewIfOpen();
         // ----> Schedule Notifications <----
         // Check if enabled *before* calling the async schedule function
-        if (
-          localStorage.getItem(STORAGE_KEY_NOTIFY_ENABLED) === "true" &&
-          Notification.permission === "granted"
-        ) {
-          await schedulePrayerNotifications(appState.currentPrayerTimes);
-        } else {
-          // If disabled, ensure any previously scheduled (for this session/day) are cleared
-          await cancelPrayerNotifications();
-        }
+        // if (
+        //   localStorage.getItem(STORAGE_KEY_NOTIFY_ENABLED) === "true" &&
+        //   Notification.permission === "granted"
+        // ) {
+        //   await schedulePrayerNotifications(appState.currentPrayerTimes);
+        // } else {
+        //   // If disabled, ensure any previously scheduled (for this session/day) are cleared
+        //   await cancelPrayerNotifications();
+        // }
         // ----> End Notification Scheduling <----
       } catch (error) {
         // Catch errors during Adhan.js calculation or parameter retrieval
@@ -1054,7 +1054,7 @@
     appState.currentPrayerTimes = null; // Clear invalid/old times data
     stopCountdown(); // Stop countdown if it was running
     // --> Cancel notifications on calculation error <--
-    await cancelPrayerNotifications();
+    // await cancelPrayerNotifications();
   }
 
   /**
@@ -2306,7 +2306,7 @@
                 appState.isUpdateAvailable = true;
                 appState.waitingServiceWorker = newWorker;
                 // Show a notification UI to the user
-                showUpdateNotification();
+                // showUpdateNotification();
               } else {
                 // This is the initial SW install completing. No user action needed.
                 console.log("Service Worker installed for the first time.");
@@ -2317,7 +2317,7 @@
       })
       .catch((error) => {
         console.error("Service Worker registration failed:", error);
-        showToast("فشل تسجيل خدمة التطبيق لتحديثات الخلفية.", "error", 5000);
+        // showToast("فشل تسجيل خدمة التطبيق لتحديثات الخلفية.", "error", 5000);
       });
 
     // --- Handle Controller Change (New SW Takes Over) ---
@@ -2622,17 +2622,17 @@
     // 5. Register Service Worker (for PWA features/caching/updates)
     registerServiceWorker();
 
-    // Setup Notification Button Listener & Initial State
-    if (notificationsSupported() && domRefs.notifyBtn) {
-      domRefs.notifyBtn.addEventListener("click", handleNotificationToggle);
-      updateNotificationButtonUI(); // Set initial button state based on permission/storage
-    } else if (domRefs.notifyBtn) {
-      domRefs.notifyBtn.disabled = true; // Disable if not supported
-      const textSpan = domRefs.notifyBtn.querySelector(".btn-text");
-      if (textSpan) textSpan.textContent = "الإشعارات غير مدعومة";
-      if (domRefs.notifyStatus)
-        domRefs.notifyStatus.textContent = "متصفحك لا يدعم الإشعارات.";
-    }
+    // // Setup Notification Button Listener & Initial State
+    // if (notificationsSupported() && domRefs.notifyBtn) {
+    //   // domRefs.notifyBtn.addEventListener("click", handleNotificationToggle);
+    //   updateNotificationButtonUI(); // Set initial button state based on permission/storage
+    // } else if (domRefs.notifyBtn) {
+    //   domRefs.notifyBtn.disabled = true; // Disable if not supported
+    //   const textSpan = domRefs.notifyBtn.querySelector(".btn-text");
+    //   if (textSpan) textSpan.textContent = "الإشعارات غير مدعومة";
+    //   if (domRefs.notifyStatus)
+    //     domRefs.notifyStatus.textContent = "متصفحك لا يدعم الإشعارات.";
+    // }
 
     // 6. Setup Core Event Listeners
     domRefs.locationButton.addEventListener("click", handleLocationButtonClick);

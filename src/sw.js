@@ -1,9 +1,8 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.1"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
 const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1";
 const OFFLINE_URL = "/offline.html";
-const NOTIFICATION_ICON = "/android-chrome-192x192.png"; // <<<--- ADDED: Path to notification icon (ensure it's in APP_SHELL_ASSETS)
 
 const APP_SHELL_ASSETS = [
   "/",
@@ -333,73 +332,3 @@ self.addEventListener("message", (event) => {
   }
 });
 
-// ==================================================
-// ---> Notification Event Handlers <---  <<<--- ADDED SECTION
-// ==================================================
-
-// --- Push Event (Standard Listener) ---
-self.addEventListener("push", (event) => {
-  console.log(
-    `SW (${APP_SHELL_CACHE_NAME}): Push Received (client-side scheduling used primarily).`
-  );
-  // This listener is standard but won't be actively used for showing notifications
-  // in our current client-side scheduling approach.
-  // If you were using backend push, you'd parse event.data and show notification here.
-});
-
-// --- Notification Click Event ---
-self.addEventListener("notificationclick", (event) => {
-  console.log(`SW (${APP_SHELL_CACHE_NAME}): Notification click Received.`);
-
-  const clickedNotification = event.notification;
-  clickedNotification.close(); // Close the notification
-
-  // This function looks for an open window for this app and focuses it.
-  // If no window is found, it opens a new one.
-  const promiseChain = clients
-    .matchAll({
-      type: "window",
-      includeUncontrolled: true, // Important to find clients immediately after activation
-    })
-    .then((windowClients) => {
-      let matchingClient = null;
-      for (const client of windowClients) {
-        // Check if the client URL is part of your app (adjust origin check if needed)
-        if (client.url.startsWith(self.location.origin) && "focus" in client) {
-          matchingClient = client;
-          break;
-        }
-      }
-
-      if (matchingClient) {
-        console.log(`SW (${APP_SHELL_CACHE_NAME}): Focusing existing window.`);
-        return matchingClient.focus();
-      } else {
-        console.log(
-          `SW (${APP_SHELL_CACHE_NAME}): No open window found, opening new one.`
-        );
-        // Adjust the URL if your app's main page is not '/'
-        return clients.openWindow("/");
-      }
-    })
-    .catch((error) => {
-      console.error(
-        `SW (${APP_SHELL_CACHE_NAME}): Error handling notification click:`,
-        error
-      );
-    });
-
-  event.waitUntil(promiseChain);
-});
-
-// --- Notification Close Event (Optional) ---
-self.addEventListener("notificationclose", (event) => {
-  // Log which notification was closed (useful for debugging/analytics)
-  console.log(
-    `SW (${APP_SHELL_CACHE_NAME}): Notification closed. Tag:`,
-    event.notification.tag
-  );
-});
-// ==================================================
-// ---> End Notification Event Handlers <---
-// ==================================================

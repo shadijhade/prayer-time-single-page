@@ -562,7 +562,9 @@ html.dark-theme .prayer-card.active {
   /* Prevent layout shift */
   margin-top: var(--gap-sm);
 }
-
+.prayer-remaining:empty {
+  display:none
+}
 .prayer-card.active .prayer-remaining {
   font-weight: var(--font-weight-medium);
   /* color: var(--primary-foreground); */
@@ -989,6 +991,7 @@ html.dark-theme .forecast-button:disabled {
   flex-direction: column;
   align-items: center;
   gap: var(--gap-sm);
+  display: none;
 }
 
 .notify-button {
