@@ -1,4 +1,4 @@
-name: Minify Assets
+name: Build and Deploy Prayer Times
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main # Trigger only on pushes to the main branch
 
 jobs:
+  # --- Build Job (Mostly unchanged, ensure artifact upload is correct) ---
   build:
     name: Build and Minify
     runs-on: ubuntu-latest
@@ -18,31 +19,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm' # Cache dependencies installed at the root
+          cache: 'npm'
 
       - name: Install Dependencies (at root)
-        run: npm ci # Installs dependencies based on root package-lock.json
+        run: npm ci
 
       - name: Create Output Directory
         run: mkdir -p dist # Create 'dist' at the root level
 
+      # --- Minification Steps (Keep these as you had them) ---
       - name: Minify HTML files (from src to dist)
         run: |
           # Find index.html and offline.html within src
           find ./src -maxdepth 1 -name "*.html" -print | while read file; do
             filename=$(basename "$file") # Get just the filename (e.g., index.html)
             output_file="dist/${filename}"
-            npx html-minifier-terser "$file" \
-              --collapse-whitespace \
-              --remove-comments \
-              --remove-optional-tags \
-              --remove-redundant-attributes \
-              --remove-script-type-attributes \
-              --remove-tag-whitespace \
-              --use-short-doctype \
-              --minify-css true \
-              --minify-js true \
-              -o "$output_file"
+            npx html-minifier-terser "$file" --collapse-whitespace --remove-comments --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype --minify-css true --minify-js true -o "$output_file"
             echo "Minified $file to $output_file"
           done
 
@@ -79,18 +71,49 @@ jobs:
            # Copy manifest
            cp src/manifest.json dist/manifest.json || echo "Warning: src/manifest.json not found."
            # Copy all PNG images
-           cp src/*.png dist/ || echo "Info: No *.png files found in src/."
+           cp src/*.png dist/ 2>/dev/null || echo "Info: No *.png files found in src/."
            # Copy favicons
-           cp src/favicon.ico dist/ || echo "Info: No favicon.ico found in src/."
-           cp src/favicon.svg dist/ || echo "Info: No favicon.svg found in src/."
-           # Note: favicon-96x96.png is covered by the *.png copy above
+           cp src/favicon.ico dist/ 2>/dev/null || echo "Info: No favicon.ico found in src/."
+           cp src/favicon.svg dist/ 2>/dev/null || echo "Info: No favicon.svg found in src/."
+           # Note: favicon-96x96.png and apple-touch-icon.png are covered by *.png
 
       - name: List dist directory contents (for debugging)
         run: ls -la dist
 
+      # --- Upload Artifact (Crucial for passing files to deploy job) ---
       - name: Upload Minified Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: prayer-times-dist
-          path: dist/ # Upload the root 'dist' directory
-          if-no-files-found: error # Fail if dist is empty
+          name: prayer-times-dist # Consistent artifact name
+          path: dist/ # Upload the 'dist' directory content
+          if-no-files-found: error
+
+  # --- Deploy Job (New Job) ---
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: build # IMPORTANT: This job runs only after 'build' succeeds
+
+    # IMPORTANT: Only run this deployment step on pushes to the main branch
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: prayer-times-dist # Must match the upload name
+          # No path specified = downloads to the root of the workspace
+
+      - name: List downloaded files (for debugging)
+        run: ls -la # Check if files are downloaded correctly
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 'prayer-times-pwa' 
+          directory: '.' # Deploy files from the root of the workspace where artifact was downloaded
+          # Optional: Branch is determined by Cloudflare based on the GitHub branch (main = production)
+          # branch: main # Explicitly set for production deployment if needed
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }} # Associates deployment with commit

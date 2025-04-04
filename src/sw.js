@@ -1,6 +1,6 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.2.9"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
 const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1";
 const OFFLINE_URL = "/offline.html";
 const NOTIFICATION_ICON = "/android-chrome-192x192.png"; // <<<--- ADDED: Path to notification icon (ensure it's in APP_SHELL_ASSETS)
