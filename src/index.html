@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مواقيت الصلاة - دقيقة ومحدثة لمدينتك</title>
+
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#14b8a6"> <!-- Will be updated by JS based on theme -->
+
+    <!-- SEO & Social Sharing -->
+    <meta name="description"
+        content="احصل على مواقيت الصلاة الدقيقة لمدينتك مجانًا وبدون إعلانات. عرض أوقات الفجر، الشروق، الظهر، العصر، المغرب، والعشاء بناءً على موقعك وطريقة الحساب المفضلة. يدعم التاريخ الهجري والميلادي.">
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="YOUR_APP_URL_HERE">
+    <meta property="og:title" content="مواقيت الصلاة - دقيقة ومحدثة">
+    <meta property="og:description" content="احصل على مواقيت الصلاة الدقيقة لمدينتك مجانًا وبدون إعلانات.">
+    <meta property="og:image" content="YOUR_SOCIAL_IMAGE_URL_HERE">
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="YOUR_APP_URL_HERE">
+    <meta property="twitter:title" content="مواقيت الصلاة - دقيقة ومحدثة">
+    <meta property="twitter:description" content="احصل على مواقيت الصلاة الدقيقة لمدينتك مجانًا وبدون إعلانات.">
+    <meta property="twitter:image" content="YOUR_SOCIAL_IMAGE_URL_HERE">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="prayer times" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
+        as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
+            rel="stylesheet">
+    </noscript>
+
+    <!-- *** ADDED: Material Symbols Font Link (Outlined, Weight 100) *** -->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,-25" />
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/style.css">
+
+    <!-- Structured Data (Schema.org) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "مواقيت الصلاة - دقيقة ومحدثة",
+        "description": "احصل على مواقيت الصلاة الدقيقة لمدينتك مجانًا وبدون إعلانات. عرض أوقات الفجر، الشروق، الظهر، العصر، المغرب، والعشاء.",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Any",
+        "url": "YOUR_APP_URL_HERE",
+        "screenshot": "YOUR_SCREENSHOT_URL_HERE",
+        "featureList": [
+            "Prayer time calculation based on location",
+            "Multiple calculation methods",
+            "Hijri and Gregorian dates",
+            "Next prayer countdown",
+            "Dark/Light theme"
+        ],
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+       }
+    }
+    </script>
+</head>
+
+<body>
+    <header role="banner">
+        <div class="themeToggle-container">
+            <input id="themeToggle" class="toggle" type="checkbox" aria-label="تبديل الوضع الداكن/الفاتح">
+            <label for="themeToggle" class="toggle-label" aria-hidden="true"></label>
+        </div>
+        <h1>مواقيت الصلاة</h1>
+        <section class="date-container" aria-label="التاريخ الحالي">
+            <div class="day-of-week" id="day-of-week" aria-live="polite" aria-atomic="true" aria-busy="true">--</div>
+            <div class="gregorian-date" id="gregorian-date" aria-live="polite" aria-atomic="true" aria-busy="true">
+                --/--/----</div>
+            <div class="hijri-date" id="hijri-date" aria-live="polite" aria-atomic="true" aria-busy="true">--/--/----
+            </div>
+        </section>
+        <div class="location-container">
+            <span class="material-symbols-rounded location-icon" aria-hidden="true">location_on</span>
+            <span id="location-status">الموقع: <span id="location" aria-live="polite" aria-atomic="true"
+                    aria-busy="true">جاري التحديد...</span></span>
+        </div>
+        <button id="use-location-btn" type="button" class="location-button"
+            aria-label="استخدام موقعي الحالي لحساب المواقيت">
+            <span class="material-symbols-rounded" aria-hidden="true">my_location</span>
+            <span class="btn-text">استخدام موقعي الحالي</span>
+        </button>
+    </header>
+
+    <main role="main">
+        <div id="cursor-light" aria-hidden="true"></div>
+
+        <section class="next-prayer-info" id="next-prayer-info" aria-labelledby="next-prayer-heading" aria-live="polite"
+            aria-relevant="text">
+            <h2 id="next-prayer-heading">الصلاة القادمة: <span id="next-prayer-name" aria-live="polite"
+                    aria-atomic="true" class="skeleton-text" aria-busy="true">--</span></h2>
+            <p>سيحين وقت الصلاة بإذن الله بعد:</p>
+            <div class="countdown skeleton-text" id="countdown" aria-atomic="true" aria-live="polite" aria-busy="true">
+                --:--:--</div>
+        </section>
+
+        <section class="prayer-times-section" aria-labelledby="prayer-times-heading">
+            <h2 id="prayer-times-heading" class="visually-hidden">أوقات الصلوات لليوم</h2>
+            <div class="prayer-times-container" id="prayer-times-container" aria-busy="true">
+                <!-- Fajr Card -->
+                <div class="prayer-card" data-prayer="fajr" role="region" aria-label="وقت صلاة الفجر">
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">nights_stay</span>الفجر</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+
+                <!-- Sunrise Card -->
+                <div class="prayer-card" data-prayer="sunrise" role="region" aria-label="وقت شروق الشمس">
+                    <!-- ADJUST THIS LINE -->
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">wb_twilight</span>الشروق</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+
+                <!-- Dhuhr Card -->
+                <div class="prayer-card" data-prayer="dhuhr" role="region" aria-label="وقت صلاة الظهر">
+                    <!-- ADJUST THIS LINE -->
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">sunny</span>الظهر</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+
+                <!-- Asr Card -->
+                <div class="prayer-card" data-prayer="asr" role="region" aria-label="وقت صلاة العصر">
+                    <!-- ADJUST THIS LINE -->
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">partly_cloudy_day</span>العصر</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+
+                <!-- Maghrib Card -->
+                <div class="prayer-card" data-prayer="maghrib" role="region" aria-label="وقت صلاة المغرب">
+                    <!-- ADJUST THIS LINE -->
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">water_lux</span>المغرب</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+
+                <!-- Isha Card -->
+                <div class="prayer-card" data-prayer="isha" role="region" aria-label="وقت صلاة العشاء">
+                    <!-- ADJUST THIS LINE -->
+                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
+                            aria-hidden="true">moon_stars</span>العشاء</div>
+                    <div class="prayer-time skeleton">--:--</div>
+                    <div class="prayer-remaining" aria-live="polite"></div>
+                </div>
+            </div>
+        </section>
+        <section class="notification-controls" aria-label="التحكم في إشعارات الصلاة">
+            <button id="notify-btn" type="button" class="notify-button" aria-pressed="false" data-state="default">
+                <span class="material-symbols-rounded icon icon-bell-off" aria-hidden="true">notifications_off</span>
+                <span class="material-symbols-rounded icon icon-bell-on" hidden aria-hidden="true">notifications</span>
+                <span class="btn-text">تفعيل الإشعارات</span>
+            </button>
+            <p id="notify-status" class="notification-status-text" aria-live="polite"></p>
+        </section>
+        <!-- Start: Forecast Section -->
+        <section class="forecast-controls" aria-label="التحكم في عرض المواقيت المستقبلية">
+            <button id="show-forecast-btn" type="button" class="forecast-button" aria-controls="forecast-section"
+                aria-expanded="false">
+                <span class="material-symbols-rounded icon" aria-hidden="true">calendar_month</span>
+                <span class="btn-text">عرض مواقيت 14 يومًا قادمة</span>
+            </button>
+        </section>
+
+        <section id="forecast-section" class="prayer-forecast-section" aria-labelledby="forecast-heading" hidden>
+            <h2 id="forecast-heading" class="visually-hidden">مواقيت الصلاة للأيام القادمة</h2>
+            <div id="forecast-table-container" class="forecast-table-container" role="region" aria-live="polite"
+                aria-busy="false">
+                <p class="forecast-placeholder">انقر على الزر أعلاه لعرض المواقيت المستقبلية.</p>
+            </div>
+        </section>
+        <!-- End: Forecast Section -->
+        <section class="calculation-method" aria-labelledby="method-heading">
+            <h2 id="method-heading">طريقة الحساب:</h2>
+            <div class="method-selector" role="group" aria-labelledby="method-heading">
+                <!-- Buttons remain the same structure -->
+                <button type="button" class="method-btn" data-method="MuslimWorldLeague" aria-pressed="false">رابطة
+                    العالم الإسلامي</button>
+                <button type="button" class="method-btn" data-method="ISNA" aria-pressed="false">أمريكا الشمالية
+                    (ISNA)</button>
+                <button type="button" class="method-btn" data-method="Egyptian" aria-pressed="false">هيئة المساحة
+                    المصرية</button>
+                <button type="button" class="method-btn" data-method="UmmAlQura" aria-pressed="false">أم القرى،
+                    مكة</button>
+                <button type="button" class="method-btn" data-method="Karachi" aria-pressed="false">جامعة العلوم
+                    الإسلامية، كراتشي</button>
+                <button type="button" class="method-btn" data-method="Tehran" aria-pressed="false">المعهد الجيوفيزيائي،
+                    طهران</button>
+                <button type="button" class="method-btn" data-method="Dubai" aria-pressed="false">دبي</button>
+                <button type="button" class="method-btn" data-method="MoonsightingCommittee" aria-pressed="false">لجنة
+                    رؤية الهلال</button>
+                <button type="button" class="method-btn" data-method="Kuwait" aria-pressed="false">الكويت</button>
+                <button type="button" class="method-btn" data-method="Qatar" aria-pressed="false">قطر</button>
+                <button type="button" class="method-btn" data-method="Singapore" aria-pressed="false">سنغافورة</button>
+            </div>
+        </section>
+    </main>
+
+    <footer role="contentinfo">
+        <p>جميع الحقوق محفوظة © <time id="current-year" datetime=""></time> - مواقيت الصلاة</p>
+    </footer>
+
+    <div id="update-notification" role="status" aria-live="assertive">
+        <span>يتوفر تحديث جديد للتطبيق.</span>
+        <button id="update-button" type="button">تحديث الآن</button>
+    </div>
+    <script src="/adhan.umd.js" defer></script>
+    <script src="/app.js" defer></script>
+</body>
+
+</html>
