@@ -4,37 +4,34 @@ on:
   push:
     branches:
       - main # Trigger only on pushes to the main branch
-      # Add other branches like 'develop' if needed:
-      # - develop
 
 jobs:
   build:
     name: Build and Minify
-    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4 # Checks out your repository's code
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Specify your desired Node.js version
-          cache: 'npm' # Enable caching for npm dependencies
+          node-version: '20'
+          cache: 'npm' # Cache dependencies installed at the root
 
-      - name: Install Dependencies
-        run: npm ci # Use 'ci' for faster, reliable installs in CI environments
+      - name: Install Dependencies (at root)
+        run: npm ci # Installs dependencies based on root package-lock.json
 
       - name: Create Output Directory
-        run: mkdir -p dist # Create a directory to store minified files
+        run: mkdir -p dist # Create 'dist' at the root level
 
-      - name: Minify HTML files
+      - name: Minify HTML files (from src to dist)
         run: |
-          # Find all HTML files, excluding node_modules and the output dir itself
-          # Minify each file and output to the 'dist' directory, preserving structure
-          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.html" -print | while read file; do
-            output_file="dist/${file#./}" # Calculate output path relative to dist
-            mkdir -p "$(dirname "$output_file")" # Ensure directory exists in dist
+          # Find index.html and offline.html within src
+          find ./src -maxdepth 1 -name "*.html" -print | while read file; do
+            filename=$(basename "$file") # Get just the filename (e.g., index.html)
+            output_file="dist/${filename}"
             npx html-minifier-terser "$file" \
               --collapse-whitespace \
               --remove-comments \
@@ -49,42 +46,51 @@ jobs:
             echo "Minified $file to $output_file"
           done
 
-      - name: Minify CSS files
+      - name: Minify CSS files (from src to dist)
         run: |
-          # Find all CSS files, excluding node_modules and dist
-          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.css" -print | while read file; do
-            output_file="dist/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
+          # Find style.css within src
+          find ./src -maxdepth 1 -name "*.css" -print | while read file; do
+            filename=$(basename "$file") # Get style.css
+            output_file="dist/${filename}"
             npx csso "$file" -o "$output_file"
             echo "Minified $file to $output_file"
           done
 
-      - name: Minify JavaScript files
+      - name: Minify JavaScript files (from src to dist)
         run: |
-          # Find all JS files, excluding node_modules and dist
-          # Skip adhan.umd.js as it's likely already minified
-          find . -path ./node_modules -prune -o -path ./dist -prune -o -name "*.js" -not -name "adhan.umd.js" -print | while read file; do
-            output_file="dist/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
+          # Find app.js and sw.js within src (exclude adhan.umd.js)
+          find ./src -maxdepth 1 -name "*.js" -not -name "adhan.umd.js" -print | while read file; do
+            filename=$(basename "$file") # Get app.js or sw.js
+            output_file="dist/${filename}"
             npx terser "$file" --compress --mangle -o "$output_file"
             echo "Minified $file to $output_file"
           done
-          # Copy files that were not minified (like adhan.umd.js) to dist
-          echo "Copying adhan.umd.js to dist/"
-          cp adhan.umd.js dist/adhan.umd.js || echo "Warning: adhan.umd.js not found at root."
+          # Copy adhan.umd.js explicitly
+          if [ -f src/adhan.umd.js ]; then
+            echo "Copying src/adhan.umd.js to dist/"
+            cp src/adhan.umd.js dist/adhan.umd.js
+          else
+            echo "Warning: src/adhan.umd.js not found."
+          fi
 
-      - name: Copy Other Essential Files (Manifest, Icons etc.)
+      - name: Copy Assets (from src to dist)
         run: |
-           echo "Copying manifest and essential assets..."
-           cp manifest.json dist/manifest.json || echo "Warning: manifest.json not found."
-           cp favicon.* dist/ 2>/dev/null || echo "Warning: Favicon files not found."
-           cp *.png dist/ 2>/dev/null || echo "Warning: PNG files not found."
-           # Add any other files/directories needed for deployment
-           # Example: cp -r images dist/
+           echo "Copying manifest, icons, and other assets from src/ to dist/..."
+           # Copy manifest
+           cp src/manifest.json dist/manifest.json || echo "Warning: src/manifest.json not found."
+           # Copy all PNG images
+           cp src/*.png dist/ || echo "Info: No *.png files found in src/."
+           # Copy favicons
+           cp src/favicon.ico dist/ || echo "Info: No favicon.ico found in src/."
+           cp src/favicon.svg dist/ || echo "Info: No favicon.svg found in src/."
+           # Note: favicon-96x96.png is covered by the *.png copy above
+
+      - name: List dist directory contents (for debugging)
+        run: ls -la dist
 
       - name: Upload Minified Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: prayer-times-dist # Name of the artifact zip file
-          path: dist/ # Upload the entire 'dist' directory
-          if-no-files-found: error # Fail the step if the dist directory is empty
+          name: prayer-times-dist
+          path: dist/ # Upload the root 'dist' directory
+          if-no-files-found: error # Fail if dist is empty
