@@ -97,6 +97,10 @@ jobs:
     # IMPORTANT: Only run this deployment step on pushes to the main branch
     if: github.ref == 'refs/heads/main'
 
+    permissions:
+        contents: read    # Needed for checkout and potentially other steps
+        deployments: write  # Crucial: Allows the action to create deployment statuses
+        
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v4
