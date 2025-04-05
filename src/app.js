@@ -56,7 +56,7 @@
   const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`; // Match button icon
 
   // --- Notification Constants ---
-  const NOTIFICATION_ICON_PATH = "/web-app-manifest-192x192.png"; // Match SW
+  const NOTIFICATION_ICON_PATH = "web-app-manifest-192x192.png"; // Match SW
   const PRE_NOTIFICATION_MINUTES = 10;
   const PRAYER_NOTIFICATION_TAG_PREFIX = "prayer-";
 
@@ -160,6 +160,9 @@
     );
     domRefs.nextPrayerName = document.getElementById("next-prayer-name");
     domRefs.countdown = document.getElementById("countdown");
+    domRefs.countdownDescription = document.getElementById(
+      "countdown-description"
+    );
     domRefs.currentYear = document.getElementById("current-year");
     domRefs.cursorLight = document.getElementById("cursor-light");
     domRefs.mainElement = document.querySelector("main");
@@ -182,7 +185,65 @@
   // ==============================================
   //          Utility Functions
   // ==============================================
+  /**
+   * Formats remaining hours and minutes into a descriptive Arabic string.
+   * Ignores seconds for the text output. Omits hours if zero.
+   * @param {number} hours - Remaining hours.
+   * @param {number} minutes - Remaining minutes.
+   * @param {number} seconds - Remaining seconds (used only to determine "less than a minute").
+   * @returns {string} Descriptive text (e.g., "متبقي ساعة و 15 دقيقة", "متبقي 10 دقائق") or an empty string.
+   */
+  function formatHoursMinutesText(hours, minutes, seconds) {
+    // If time is up or passed
+    if (hours <= 0 && minutes <= 0 && seconds <= 0) {
+      // The main countdown logic usually handles the immediate transition,
+      // but this provides a fallback text if needed briefly.
+      return "حان وقت الصلاة الآن";
+    }
 
+    const hourParts = [];
+    const minuteParts = [];
+
+    // --- Format Hours ---
+    if (hours === 1) {
+      hourParts.push("ساعة");
+    } else if (hours === 2) {
+      hourParts.push("ساعتين");
+    } else if (hours > 2) {
+      // Using digits for clarity with larger numbers
+      hourParts.push(`${hours} ساعات`);
+    }
+    // If hours = 0, hourParts remains empty.
+
+    // --- Format Minutes ---
+    if (minutes === 1) {
+      minuteParts.push("دقيقة"); // Singular minute
+    } else if (minutes === 2) {
+      minuteParts.push("دقيقتان"); // Dual minutes
+    } else if (minutes >= 3 && minutes <= 10) {
+      minuteParts.push(`${minutes} دقائق`); // Plural minutes (3-10)
+    } else if (minutes > 10) {
+      // Using digits for clarity with larger numbers
+      minuteParts.push(`${minutes} دقيقة`); // Singular minute (11+)
+    }
+    // If minutes = 0, minuteParts remains empty.
+
+    // --- Combine ---
+    let combinedText = "";
+    if (hourParts.length > 0 && minuteParts.length > 0) {
+      combinedText = hourParts.join(" ") + " و " + minuteParts.join(" "); // e.g., "ساعة و 5 دقائق"
+    } else if (hourParts.length > 0) {
+      combinedText = hourParts.join(" "); // e.g., "ساعتين"
+    } else if (minuteParts.length > 0) {
+      combinedText = minuteParts.join(" "); // e.g., "15 دقيقة"
+    } else if (hours <= 0 && minutes <= 0 && seconds > 0) {
+      // Only seconds remaining
+      combinedText = "أقل من دقيقة";
+    }
+
+    // Add prefix if there's text to display
+    return combinedText ? "متبقي " + combinedText : "";
+  }
   /**
    * Checks if a value is a valid Date object.
    * @param {*} d - Value to check.
@@ -1433,15 +1494,29 @@
 
       // Check if the prayer time has been reached or passed
       if (timeDifferenceMillis <= 0) {
-        handleNextPrayerTimeReached(); // Trigger refresh logic
-        return; // Stop this tick; refresh will start a new countdown
+        if (domRefs.countdownDescription) {
+          domRefs.countdownDescription.textContent = "حان وقت الصلاة الآن";
+          domRefs.countdownDescription.classList.remove(CSS_SKELETON_TEXT);
+        }
+        handleNextPrayerTimeReached();
+        return;
       }
 
       // --- Update UI Elements ---
 
       // 1. Update the main countdown timer display (e.g., HH:MM:SS)
       updateCountdownDisplay(timeDifferenceMillis / 1000); // Convert ms to seconds
-
+      // 1.5 Update the countdown description
+      if (domRefs.countdownDescription) {
+        const totalSeconds = Math.floor(timeDifferenceMillis / 1000);      
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60); // Still need seconds for "less than a minute" case
+        // 👇 Use the new function here 👇
+        const descriptionText = formatHoursMinutesText(hours, minutes, seconds);
+        domRefs.countdownDescription.textContent = descriptionText;
+        domRefs.countdownDescription.classList.remove(CSS_SKELETON_TEXT);
+      }
       // 2. Update the "Next Prayer" name display (only if needed)
       // This check prevents unnecessary DOM updates if the name hasn't changed.
       const expectedNextPrayerName = isNextPrayerTomorrow
@@ -1484,6 +1559,10 @@
     if (domRefs.nextPrayerName) {
       domRefs.nextPrayerName.textContent = "خطأ";
       domRefs.nextPrayerName.classList.add(CSS_SKELETON_TEXT);
+    }
+    if (domRefs.countdownDescription) {
+      domRefs.countdownDescription.textContent = "";
+      domRefs.countdownDescription.classList.add(CSS_SKELETON_TEXT);
     }
     // Consider showing a toast, but be mindful of spamming if the error persists every second
     // showToast("خطأ في تحديث الوقت المتبقي.", 'error', 5000);
@@ -1621,6 +1700,11 @@
       // Display placeholder/error state consistently
       el.textContent = "--:--:--";
       el.classList.add(CSS_SKELETON_TEXT);
+      // Clear description as well when countdown is placeholder/error
+      if (domRefs.countdownDescription) {
+        domRefs.countdownDescription.textContent = "";
+        domRefs.countdownDescription.classList.add(CSS_SKELETON_TEXT); // Show skeleton
+      }
       return;
     }
 
@@ -1672,7 +1756,13 @@
       domRefs.countdown.classList.toggle(CSS_SKELETON_TEXT, showSkeleton);
       if (showSkeleton) updateCountdownDisplay(-1); // Set countdown to placeholder '--:--:--'
     }
-
+    if (domRefs.countdownDescription) {
+      domRefs.countdownDescription.classList.toggle(
+        CSS_SKELETON_TEXT,
+        showSkeleton
+      );
+      if (showSkeleton) domRefs.countdownDescription.textContent = ""; // Clear text
+    }
     // Stop countdown when entering skeleton state.
     // Clear prayer times data as it's no longer represented by the UI.
     if (showSkeleton) {
@@ -1712,46 +1802,50 @@
   // ==============================================
   //          UI Effects (Cursor Light)
   // ==============================================
-
-  /** Initializes the cursor light effect if not on a touch device. */
-  function initializeMouseEffects() {
+  /** Initializes UI effects based on input type (mouse or touch). */
+  function initializeUiEffects() {
+    // Renamed for clarity
     const lightElement = domRefs.cursorLight;
     const mainArea = domRefs.mainElement;
 
     if (!lightElement || !mainArea) {
       console.warn(
-        "Cursor light effect disabled: Required elements (#cursor-light, main) not found."
+        "UI effect disabled: Required elements (#cursor-light, main) not found."
       );
+      appState.isMouseEffectEnabled = false; // Keep track of desktop effect state
       return;
     }
 
-    // Enhanced touch detection (more reliable than just 'ontouchstart')
+    // Enhanced touch detection
     const hasTouch =
       "ontouchstart" in window ||
       navigator.maxTouchPoints > 0 ||
       window.matchMedia("(pointer:coarse)").matches;
 
     if (hasTouch) {
-      console.log("Touch input detected, disabling cursor light effect.");
-      lightElement.style.display = "none"; // Hide the element permanently
-      appState.isMouseEffectEnabled = false;
-      return; // Do not add listeners
+      console.log("Touch input detected, setting up mobile scroll effect.");
+      appState.isMouseEffectEnabled = false; // Desktop effect is off
+      setupMobileScrollEffect(lightElement, mainArea); // Call mobile setup
+      // --- Ensure desktop-specific styles applied by JS are removed ---
+      lightElement.style.opacity = ""; // Let CSS handle opacity
+      lightElement.style.transform = ""; // Let CSS handle transform
+      // No need to hide the element, CSS media query handles visibility/positioning
+    } else {
+      console.log("Pointer device detected, initializing cursor light effect.");
+      appState.isMouseEffectEnabled = true; // Desktop effect is on
+      setupDesktopMouseEffect(lightElement, mainArea); // Call desktop setup
     }
-
-    // Proceed only for non-touch devices
-    console.log("Initializing cursor light effect for pointer device.");
-    appState.isMouseEffectEnabled = true;
-
-    // Style setup (ensure these are safe to apply)
+  }
+  /** Sets up the cursor-following light effect for desktop. */
+  function setupDesktopMouseEffect(lightElement, mainArea) {
+    // Style setup for desktop
     lightElement.style.opacity = "0"; // Start hidden
     lightElement.style.position = "absolute"; // Needed for positioning
-    lightElement.style.pointerEvents = "none"; // Prevent interference with clicks/hovers
-    lightElement.style.willChange = "transform"; // Hint browser about upcoming changes
+    lightElement.style.pointerEvents = "none";
+    lightElement.style.willChange = "transform"; // Already set in base CSS, but good to confirm
 
     let mouseX = 0,
       mouseY = 0;
-    // Cache prayer cards *potentially* affected by the glow.
-    // This needs to be refreshed if the cards change (e.g., after calculation).
     let potentiallyAffectedCards = [];
     function refreshAffectedCards() {
       potentiallyAffectedCards = Array.from(
@@ -1759,68 +1853,51 @@
       );
     }
 
-    // The function run by requestAnimationFrame
     function updateEffectFrame() {
-      // Exit early if effect was disabled or element removed
       if (!appState.isMouseEffectEnabled || !domRefs.mainElement) return;
-
-      const mainRect = mainArea.getBoundingClientRect(); // Get dimensions in frame
-      // Calculate light position relative to the main element's top-left corner
+      const mainRect = mainArea.getBoundingClientRect();
       const lightX = mouseX - mainRect.left - lightElement.offsetWidth / 2;
       const lightY = mouseY - mainRect.top - lightElement.offsetHeight / 2;
-
-      // Apply position using translate3d for potential hardware acceleration
       lightElement.style.transform = `translate3d(${lightX}px, ${lightY}px, 0)`;
 
-      // Update glow effect on relevant cards
       potentiallyAffectedCards.forEach((card) => {
-        // Double-check if the card became active since caching, or if it's still valid
         if (card.isConnected && !card.classList.contains(CSS_ACTIVE)) {
           updateCardGlow(card, mouseX, mouseY);
         } else {
-          // Card became active or removed, reset its glow properties
           resetCardGlow(card);
-          // Optional: Remove from potentiallyAffectedCards array here? (Might be complex)
         }
       });
-
-      appState.mouseEffectRAFId = null; // Signal that the frame is done
+      appState.mouseEffectRAFId = null;
     }
 
-    // Request animation frame when mouse moves
     function scheduleEffectUpdate(event) {
       mouseX = event.clientX;
       mouseY = event.clientY;
-      // Only request a new frame if one isn't already pending and effect is enabled
       if (!appState.mouseEffectRAFId && appState.isMouseEffectEnabled) {
         appState.mouseEffectRAFId = requestAnimationFrame(updateEffectFrame);
       }
     }
 
-    // Fade in light and refresh card list on entering the main area
     function handleMouseEnter() {
       if (!appState.isMouseEffectEnabled) return;
-      refreshAffectedCards(); // Update the list of cards to affect
-      lightElement.style.opacity = "1"; // Fade in
-      // Ensure an update runs even if mouse stops immediately after entering
+      refreshAffectedCards();
+      lightElement.style.opacity = "1"; // Fade in via CSS transition
       if (!appState.mouseEffectRAFId) {
         appState.mouseEffectRAFId = requestAnimationFrame(updateEffectFrame);
       }
     }
 
-    // Fade out light, cancel pending frame, and reset glows on leaving
     function handleMouseLeave() {
       if (!appState.isMouseEffectEnabled) return;
       if (appState.mouseEffectRAFId) {
         cancelAnimationFrame(appState.mouseEffectRAFId);
         appState.mouseEffectRAFId = null;
       }
-      lightElement.style.opacity = "0"; // Fade out
-      // Reset glow on all cards when mouse leaves the tracked area
+      lightElement.style.opacity = "0"; // Fade out via CSS transition
       mainArea.querySelectorAll(SEL_PRAYER_CARD).forEach(resetCardGlow);
     }
 
-    // Add listeners with passive: true as we don't preventDefault
+    // Add DESKTOP listeners
     mainArea.addEventListener("mousemove", scheduleEffectUpdate, {
       passive: true,
     });
@@ -1831,8 +1908,55 @@
       passive: true,
     });
 
-    // Ensure cards are reset initially
+    // Initial reset for cards
     mainArea.querySelectorAll(SEL_PRAYER_CARD).forEach(resetCardGlow);
+  }
+
+  /** Sets up the background glow effect that reacts to scroll on mobile. */
+  function setupMobileScrollEffect(lightElement, mainArea) {
+    // Basic throttle function
+    let throttleTimeout = null;
+    const throttleDelay = 100; // ms - Adjust as needed
+
+    function throttle(callback, delay) {
+      if (throttleTimeout) return; // Don't run if already waiting
+      throttleTimeout = setTimeout(() => {
+        callback();
+        throttleTimeout = null; // Clear timeout after execution
+      }, delay);
+    }
+
+    // Timeout for removing the 'dancing' class
+    let danceTimeout = null;
+    const danceDuration = 400; // ms - Should match CSS transition duration
+
+    function handleScroll() {
+      // Apply the dancing effect
+      lightElement.classList.add("is-dancing");
+
+      // Clear any existing timeout to remove the class
+      if (danceTimeout) {
+        clearTimeout(danceTimeout);
+      }
+
+      // Set a new timeout to remove the class after the animation duration
+      danceTimeout = setTimeout(() => {
+        lightElement.classList.remove("is-dancing");
+        danceTimeout = null;
+      }, danceDuration);
+    }
+
+    // Add MOBILE scroll listener with throttling
+    window.addEventListener(
+      "scroll",
+      () => {
+        throttle(handleScroll, throttleDelay);
+      },
+      { passive: true }
+    );
+
+    // No need to set initial styles here, CSS media query handles it
+    console.log("Mobile scroll effect listener attached.");
   }
 
   /**
@@ -2306,7 +2430,7 @@
                 appState.isUpdateAvailable = true;
                 appState.waitingServiceWorker = newWorker;
                 // Show a notification UI to the user
-                // showUpdateNotification();
+                showUpdateNotification();
               } else {
                 // This is the initial SW install completing. No user action needed.
                 console.log("Service Worker installed for the first time.");
@@ -2617,7 +2741,7 @@
     await setupMethodButtons(); // Load method pref and set up buttons visually
 
     // 4. Initialize Interactive Features
-    initializeMouseEffects(); // Setup cursor light effect (checks for touch)
+    initializeUiEffects(); // Setup cursor light effect (checks for touch)
 
     // 5. Register Service Worker (for PWA features/caching/updates)
     registerServiceWorker();

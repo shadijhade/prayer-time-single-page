@@ -336,37 +336,47 @@ footer {
 
 /* --- Cursor Light Effect --- */
 #cursor-light {
-  position: absolute;
+  /* Common styles for both desktop & mobile base state */
+  position: absolute; /* Position relative to nearest positioned ancestor (main) */
   width: var(--cursor-light-size);
   height: var(--cursor-light-size);
   border-radius: 50%;
+  pointer-events: none;
+  z-index: var(--z-base); /* Below content */
+  will-change: transform, opacity; /* Optimization hint */
+
+  /* Default Background (can be overridden by dark theme) */
+  --glow-intensity: 0.12; /* Define intensity var */
+  --glow-size: 60%; /* Define size var */
   background: radial-gradient(
     circle,
-    rgba(var(--primary-rgb), 0.12) 0%,
-    rgba(var(--primary-rgb), 0.08) 25%,
-    transparent 60%
+    rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
+    rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
+    transparent var(--glow-size)
   );
+
+  /* --- DESKTOP SPECIFIC Defaults --- */
+  /* (Will be overridden on mobile by media query) */
   top: 0;
   left: 0;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: var(--z-base);
-  /* Below content */
-  transition: opacity var(--transition-duration-base) var(--transition-easing);
-  opacity: 0;
-  will-change: transform, opacity;
-  /* Optimization for movement */
+  transform: translate(-50%, -50%); /* Start off-center for initial placement */
+  opacity: 0; /* Start hidden on desktop */
+  transition: opacity var(--transition-duration-base) var(--transition-easing),
+    transform 0s linear,
+    /* No transition for desktop positioning */ background
+      var(--transition-duration-base) var(--transition-easing); /* Theme transition */
 }
 
 html.dark-theme #cursor-light {
+  /* Dark theme overrides */
+  --glow-intensity: 0.08; /* Adjust dark theme intensity if needed */
   background: radial-gradient(
     circle,
-    rgba(var(--primary-rgb), 0.08) 0%,
-    rgba(var(--primary-rgb), 0.05) 25%,
-    transparent 60%
+    rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
+    rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
+    transparent var(--glow-size)
   );
 }
-
 /* --- Base Card Styling --- */
 .card-base {
   position: relative;
@@ -563,7 +573,7 @@ html.dark-theme .prayer-card.active {
   margin-top: var(--gap-sm);
 }
 .prayer-remaining:empty {
-  display:none
+  display: none;
 }
 .prayer-card.active .prayer-remaining {
   font-weight: var(--font-weight-medium);
@@ -1147,6 +1157,48 @@ html.dark-theme .offline-container .retry-button:hover {
 /* ========================================= */
 /* MEDIA QUERIES (Responsive Design)       */
 /* ========================================= */
+@media (hover: none) and (pointer: coarse) {
+  /* --- MOBILE #cursor-light --- */
+  #cursor-light {
+    display: block !important; /* Ensure it's displayed */
+    opacity: 1 !important; /* Make it always visible */
+    top: 50%; /* Center vertically */
+    left: 50%; /* Center horizontally */
+    /* Center element precisely and set base scale */
+    transform: translate(-50%, -50%) scale(1);
+    /* Add transition for transform changes during scroll effect */
+    transition: opacity var(--transition-duration-base) var(--transition-easing),
+      transform 0.4s var(--transition-easing-out),
+      /* For the 'dance' */ background var(--transition-duration-base)
+        var(--transition-easing); /* Theme transition */
+  }
+
+  /* Optional: Style for the "dancing" state triggered by JS */
+  #cursor-light.is-dancing {
+    transform: translate(-50%, -50%) scale(1.15); /* Pulse bigger */
+    /* You could also subtly change opacity or intensity here if desired */
+    /* opacity: 0.9; */
+  }
+  /* --- End MOBILE #cursor-light --- */
+
+  /* --- Other Mobile overrides (like disabling desktop hover) --- */
+  .prayer-card.active {
+    /* Keep previous active card pulse or remove if distracting */
+    /* animation: mobile-active-glow 2.2s infinite ease-in-out; */
+    transform: none !important; /* Still important to prevent desktop hover transforms */
+  }
+  .prayer-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: none;
+  }
+  .prayer-card.active:hover {
+    box-shadow: none; /* Let active styles/animations control */
+    transform: none;
+  }
+  .prayer-card::before {
+    opacity: 0 !important;
+  }
+}
 
 /* --- Tablet and Smaller (<= 768px) --- */
 @media (max-width: 768px) {
@@ -1170,7 +1222,31 @@ html.dark-theme .offline-container .retry-button:hover {
   .next-prayer-info .countdown {
     font-size: var(--font-size-2xl);
   }
+  .next-prayer-info .countdown-description {
+    font-size: var(--font-size-sm); /* Smaller than main countdown */
+    color: var(--muted-foreground); /* Use muted color */
+    margin-top: var(--gap-sm); /* Add some space */
+    min-height: 1.2em; /* Prevent layout jump when empty */
+    line-height: 1.4;
+    font-weight: var(--font-weight-medium);
+    transition: color var(--transition-duration-fast) var(--transition-easing);
+  }
 
+  /* Ensure skeleton style applies */
+  .countdown-description.skeleton-text {
+    color: var(--muted-foreground) !important;
+    /* content: '...'; Optional placeholder */
+    /* Or keep background/color changes consistent with other skeletons */
+    background-color: var(--secondary); /* Example skeleton background */
+    border-radius: var(--radius-xs);
+    width: 60%; /* Example width */
+    margin-left: auto;
+    margin-right: auto;
+    opacity: 0.5;
+  }
+  .countdown-description.skeleton-text:empty::before {
+    content: "\00a0"; /* Non-breaking space to give it height */
+  }
   .themeToggle-container {
     top: 0.75rem;
     left: 1rem;

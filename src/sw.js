@@ -1,22 +1,21 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.1"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
-const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1";
-const OFFLINE_URL = "/offline.html";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.3"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
+const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.1";
+const OFFLINE_URL = "offline.html";
 
 const APP_SHELL_ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.json",
-  "/web-app-manifest-512x512.png",
-  "/web-app-manifest-192x192.png",
-  "/favicon.svg",
-  "/favicon.ico",
-  "/favicon-96x96.png", // Icon used for notifications
-  "/apple-touch-icon.png",
-  "/adhan.umd.js",
-  "/style.css",
-  "/app.js",
+  "index.html",
+  "manifest.json",
+  "web-app-manifest-512x512.png",
+  "web-app-manifest-192x192.png",
+  "favicon.svg",
+  "favicon.ico",
+  "favicon-96x96.png", // Icon used for notifications
+  "apple-touch-icon.png",
+  "adhan.umd.js",
+  "style.css",
+  "app.js",
   OFFLINE_URL,
   // Add essential CSS if separate file, fonts if self-hosted etc.
 ];
