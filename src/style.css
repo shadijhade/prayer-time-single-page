@@ -149,12 +149,12 @@ html.dark-theme {
   box-sizing: border-box;
   border-color: var(--border);
   /* Apply transitions more selectively if needed, but this is a simple default */
-  transition: background-color var(--transition-duration-base)
-      var(--transition-easing),
+  transition: background-color var(--transition-duration-base) var(--transition-easing),
     color var(--transition-duration-fast) var(--transition-easing),
     border-color var(--transition-duration-base) var(--transition-easing);
   font-family: var(--font-family-sans);
 }
+
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
   border-radius: 5px;
@@ -183,6 +183,7 @@ body {
 .material-symbols-rounded {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" -25, "opsz" 24;
 }
+
 .visually-hidden {
   border: 0;
   clip: rect(0 0 0 0);
@@ -192,8 +193,10 @@ body {
   padding: 0;
   position: absolute;
   width: 1px;
-  white-space: nowrap; /* Optional: prevents line breaks if text wraps */
+  white-space: nowrap;
+  /* Optional: prevents line breaks if text wraps */
 }
+
 /* ========================================= */
 /* LAYOUT COMPONENTS                         */
 /* ========================================= */
@@ -312,7 +315,7 @@ main {
 }
 
 /* Center content within main */
-main > * {
+main>* {
   max-width: var(--max-width);
   margin-left: auto;
   margin-right: auto;
@@ -337,46 +340,52 @@ footer {
 /* --- Cursor Light Effect --- */
 #cursor-light {
   /* Common styles for both desktop & mobile base state */
-  position: absolute; /* Position relative to nearest positioned ancestor (main) */
+  position: absolute;
+  /* Position relative to nearest positioned ancestor (main) */
   width: var(--cursor-light-size);
   height: var(--cursor-light-size);
   border-radius: 50%;
   pointer-events: none;
-  z-index: var(--z-base); /* Below content */
-  will-change: transform, opacity; /* Optimization hint */
+  z-index: var(--z-base);
+  /* Below content */
+  will-change: transform, opacity;
+  /* Optimization hint */
 
   /* Default Background (can be overridden by dark theme) */
-  --glow-intensity: 0.12; /* Define intensity var */
-  --glow-size: 60%; /* Define size var */
-  background: radial-gradient(
-    circle,
-    rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
-    rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
-    transparent var(--glow-size)
-  );
+  --glow-intensity: 0.12;
+  /* Define intensity var */
+  --glow-size: 60%;
+  /* Define size var */
+  background: radial-gradient(circle,
+      rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
+      rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
+      transparent var(--glow-size));
 
   /* --- DESKTOP SPECIFIC Defaults --- */
   /* (Will be overridden on mobile by media query) */
   top: 0;
   left: 0;
-  transform: translate(-50%, -50%); /* Start off-center for initial placement */
-  opacity: 0; /* Start hidden on desktop */
+  transform: translate(-50%, -50%);
+  /* Start off-center for initial placement */
+  opacity: 0;
+  /* Start hidden on desktop */
   transition: opacity var(--transition-duration-base) var(--transition-easing),
     transform 0s linear,
-    /* No transition for desktop positioning */ background
-      var(--transition-duration-base) var(--transition-easing); /* Theme transition */
+    /* No transition for desktop positioning */
+    background var(--transition-duration-base) var(--transition-easing);
+  /* Theme transition */
 }
 
 html.dark-theme #cursor-light {
   /* Dark theme overrides */
-  --glow-intensity: 0.08; /* Adjust dark theme intensity if needed */
-  background: radial-gradient(
-    circle,
-    rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
-    rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
-    transparent var(--glow-size)
-  );
+  --glow-intensity: 0.08;
+  /* Adjust dark theme intensity if needed */
+  background: radial-gradient(circle,
+      rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
+      rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
+      transparent var(--glow-size));
 }
+
 /* --- Base Card Styling --- */
 .card-base {
   position: relative;
@@ -464,8 +473,7 @@ html.dark-theme .calculation-method {
   overflow: hidden;
   /* Contain the glow */
   /* Inherits base card styles */
-  transition: background-color var(--transition-duration-fast)
-      var(--transition-easing-in-out),
+  transition: background-color var(--transition-duration-fast) var(--transition-easing-in-out),
     color var(--transition-duration-fast) var(--transition-easing-in-out),
     border-color var(--transition-duration-fast) var(--transition-easing-in-out),
     transform var(--transition-duration-fast) var(--transition-easing-in-out),
@@ -476,23 +484,16 @@ html.dark-theme .calculation-method {
   content: "";
   position: absolute;
   inset: var(--card-glow-inset);
-  border-radius: calc(
-    var(--radius) + abs(var(--card-glow-inset)) -
-      var(--card-glow-blur-radius-factor)
-  );
-  background: radial-gradient(
-    circle at var(--glow-posX, 50%) var(--glow-posY, 50%),
-    rgba(var(--primary-rgb), var(--card-glow-intensity)) 0%,
-    rgba(var(--primary-rgb), calc(var(--card-glow-intensity) * 0.5))
-      calc(var(--card-glow-size) / 3),
-    transparent var(--card-glow-size)
-  );
+  border-radius: calc(var(--radius) + abs(var(--card-glow-inset)) - var(--card-glow-blur-radius-factor));
+  background: radial-gradient(circle at var(--glow-posX, 50%) var(--glow-posY, 50%),
+      rgba(var(--primary-rgb), var(--card-glow-intensity)) 0%,
+      rgba(var(--primary-rgb), calc(var(--card-glow-intensity) * 0.5)) calc(var(--card-glow-size) / 3),
+      transparent var(--card-glow-size));
   opacity: var(--glow-opacity, 0);
   z-index: -1;
   /* Behind card content */
   pointer-events: none;
-  transition: opacity var(--transition-duration-base)
-    var(--transition-easing-out);
+  transition: opacity var(--transition-duration-base) var(--transition-easing-out);
   will-change: opacity, background;
   /* Optimize for glow animation */
 }
@@ -539,11 +540,16 @@ html.dark-theme .prayer-card.active {
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--gap-md);
   color: var(--card-foreground);
-  display: flex; /* Arrange icon and text side-by-side */
-  align-items: center; /* Vertically align icon and text */
-  justify-content: center; /* Keep content centered in the card */
-  gap: var(--gap-sm); /* Add space between icon and text */
+  display: flex;
+  /* Arrange icon and text side-by-side */
+  align-items: center;
+  /* Vertically align icon and text */
+  justify-content: center;
+  /* Keep content centered in the card */
+  gap: var(--gap-sm);
+  /* Add space between icon and text */
 }
+
 .prayer-icon {
   font-size: var(--font-size-2xl);
   flex-shrink: 0;
@@ -572,17 +578,22 @@ html.dark-theme .prayer-card.active {
   /* Prevent layout shift */
   margin-top: var(--gap-sm);
 }
+
 .prayer-remaining:empty {
   display: none;
 }
+
 .prayer-card.active .prayer-remaining {
   font-weight: var(--font-weight-medium);
   /* color: var(--primary-foreground); */
   /* Already handled by .active */
 }
+
 .prayer-card.active .prayer-icon {
-  color: var(--primary-foreground); /* Match active text color */
+  color: var(--primary-foreground);
+  /* Match active text color */
 }
+
 /* --- Calculation Method Selector --- */
 .calculation-method {
   margin-top: var(--gap-2xl);
@@ -725,19 +736,21 @@ html.dark-theme .toast {
 }
 
 .toast .toast-close {
+  position:relative;
+  top:0px;
+  bottom:0px;
   background: none;
   border: none;
   color: var(--muted-foreground);
-  font-size: 1.5rem;
-  line-height: 1;
+  font-size: 28px;
   cursor: pointer;
   opacity: 0.7;
   transition: opacity var(--transition-duration-fast) var(--transition-easing);
   flex-shrink: 0;
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  width: 30px;
-  padding-bottom: 0.2rem;
+  padding: 0;
+  margin: 0;
+  margin-top: 2px;
 }
 
 .toast .toast-close:hover {
@@ -791,13 +804,13 @@ html.dark-theme .toast {
   transform: scale(0.75);
   color: var(--toggle-sun-color);
   box-shadow: inset 0 0 0 var(--size),
-    /* Center fill */ /* Rays */ calc(var(--offset-orthogonal) * -1) 0 0
-      var(--ray-size),
+    /* Center fill */
+    /* Rays */
+    calc(var(--offset-orthogonal) * -1) 0 0 var(--ray-size),
     var(--offset-orthogonal) 0 0 var(--ray-size),
     0 calc(var(--offset-orthogonal) * -1) 0 var(--ray-size),
     0 var(--offset-orthogonal) 0 var(--ray-size),
-    calc(var(--offset-diagonal) * -1) calc(var(--offset-diagonal) * -1) 0
-      var(--ray-size),
+    calc(var(--offset-diagonal) * -1) calc(var(--offset-diagonal) * -1) 0 var(--ray-size),
     var(--offset-diagonal) var(--offset-diagonal) 0 var(--ray-size),
     calc(var(--offset-diagonal) * -1) var(--offset-diagonal) 0 var(--ray-size),
     var(--offset-diagonal) calc(var(--offset-diagonal) * -1) 0 var(--ray-size);
@@ -855,24 +868,28 @@ html.dark-theme .toast {
 #update-notification button:hover {
   filter: brightness(var(--primary-active-brightness));
 }
+
 /* ========================================= */
 /* FORECAST SECTION STYLES                   */
 /* ========================================= */
 
 .forecast-controls {
   margin-top: var(--gap-2xl);
-  text-align: center; /* Center the button */
+  text-align: center;
+  /* Center the button */
 }
 
 .forecast-button {
   background-color: transparent;
   color: var(--primary);
   border: 1px solid var(--primary);
-  padding: 0.6rem 1.2rem; /* Adjusted padding */
+  padding: 0.6rem 1.2rem;
+  /* Adjusted padding */
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-duration-fast) var(--transition-easing);
-  font-size: var(--font-size-base); /* Slightly larger */
+  font-size: var(--font-size-base);
+  /* Slightly larger */
   font-weight: var(--font-weight-medium);
   display: inline-flex;
   gap: var(--gap-sm);
@@ -902,6 +919,7 @@ html.dark-theme .forecast-button {
   color: var(--ring);
   border-color: var(--ring);
 }
+
 html.dark-theme .forecast-button:disabled {
   border-color: var(--muted);
   color: var(--muted);
@@ -919,10 +937,13 @@ html.dark-theme .forecast-button:disabled {
 }
 
 .forecast-table-container {
-  overflow-x: auto; /* Enable horizontal scroll on small screens */
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  overflow-x: auto;
+  /* Enable horizontal scroll on small screens */
+  -webkit-overflow-scrolling: touch;
+  /* Smooth scrolling on iOS */
   margin-top: var(--gap-md);
-  max-height: 60vh; /* Limit height and allow vertical scroll if needed */
+  max-height: 60vh;
+  /* Limit height and allow vertical scroll if needed */
   overflow-y: auto;
   scrollbar-color: var(--foreground) transparent;
   padding-left: 2px;
@@ -949,25 +970,33 @@ html.dark-theme .forecast-button:disabled {
 .forecast-table td {
   border: none;
   padding: var(--gap-sm) var(--gap-md);
-  text-align: right; /* Center align time */
+  text-align: right;
+  /* Center align time */
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
 }
 
-.forecast-table th:first-child, /* Date column */
+.forecast-table th:first-child,
+/* Date column */
 .forecast-table td:first-child {
-  white-space: normal; /* Allow date wrapping if needed */
-  min-width: 120px; /* Give date column more space */
+  white-space: normal;
+  /* Allow date wrapping if needed */
+  min-width: 120px;
+  /* Give date column more space */
 }
+
 .forecast-table tr:last-child td {
   border-bottom: none;
 }
+
 .forecast-table th:first-child {
   border-top-right-radius: var(--radius);
 }
+
 .forecast-table th:last-child {
   border-top-left-radius: var(--radius);
 }
+
 .forecast-table th {
   color: var(--secondary-foreground);
   background-color: var(--card-background);
@@ -982,14 +1011,17 @@ html.dark-theme .forecast-button:disabled {
   height: calc(var(--footer-padding-y) + 4px);
   border-bottom: 1px solid var(--border);
 }
+
 .table-warpper {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+
 /* Ensure the hidden attribute works */
 #forecast-section[hidden] {
   display: none;
 }
+
 /* ========================================= */
 /* NOTIFICATION CONTROLS STYLES              */
 /* ========================================= */
@@ -1019,11 +1051,13 @@ html.dark-theme .forecast-button:disabled {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  min-width: 180px; /* Ensure minimum width */
+  min-width: 180px;
+  /* Ensure minimum width */
 }
 
 .notify-button .icon {
-  color: var(--muted-foreground); /* Default muted color for icon */
+  color: var(--muted-foreground);
+  /* Default muted color for icon */
   transition: color var(--transition-duration-fast) var(--transition-easing);
 }
 
@@ -1042,9 +1076,12 @@ html.dark-theme .forecast-button:disabled {
   color: var(--primary-foreground);
   border-color: var(--primary);
 }
+
 .notify-button[aria-pressed="true"] .icon {
-  color: var(--primary-foreground); /* Icon color when active */
+  color: var(--primary-foreground);
+  /* Icon color when active */
 }
+
 .notify-button[aria-pressed="true"]:hover {
   filter: brightness(var(--primary-active-brightness));
 }
@@ -1059,6 +1096,7 @@ html.dark-theme .forecast-button:disabled {
   border-color: var(--border);
   color: var(--muted-foreground);
 }
+
 .notify-button[data-state="denied"] .icon,
 .notify-button:disabled .icon {
   color: var(--muted-foreground);
@@ -1067,8 +1105,10 @@ html.dark-theme .forecast-button:disabled {
 .notification-status-text {
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
-  min-height: 1.2em; /* Prevent layout shift */
+  min-height: 1.2em;
+  /* Prevent layout shift */
 }
+
 /* ========================================= */
 /* ANIMATIONS                                */
 /* ========================================= */
@@ -1081,20 +1121,43 @@ html.dark-theme .forecast-button:disabled {
     rotate: 360deg;
   }
 }
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    /* Example pulse: slightly larger and less opaque */
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
 .offline-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  min-height: 60vh; /* Adjust as needed */
+  min-height: 60vh;
+  /* Adjust as needed */
   padding: var(--main-padding-y) var(--main-padding-x);
-  max-width: 600px; /* Limit width for readability */
-  margin: auto; /* Center horizontally */
+  max-width: 600px;
+  /* Limit width for readability */
+  margin: auto;
+  /* Center horizontally */
 }
 
 .offline-container .offline-icon {
-  font-size: 4rem; /* Make icon large */
+  font-size: 4rem;
+  /* Make icon large */
   color: var(--muted-foreground);
   margin-bottom: var(--gap-lg);
 }
@@ -1123,9 +1186,9 @@ html.dark-theme .forecast-button:disabled {
   cursor: pointer;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
-  transition: background-color var(--transition-duration-fast)
-    var(--transition-easing);
-  display: inline-flex; /* If you want icon + text later */
+  transition: background-color var(--transition-duration-fast) var(--transition-easing);
+  display: inline-flex;
+  /* If you want icon + text later */
   align-items: center;
   gap: var(--gap-sm);
   -webkit-tap-highlight-color: transparent;
@@ -1142,60 +1205,74 @@ html.dark-theme .forecast-button:disabled {
 
 /* Dark theme adjustments for the retry button */
 html.dark-theme .offline-container .retry-button {
-  color: var(--ring); /* Use a lighter color like cyan for text/border */
+  color: var(--ring);
+  /* Use a lighter color like cyan for text/border */
   border-color: var(--ring);
 }
 
 html.dark-theme .offline-container .retry-button:hover {
-  background-color: rgba(
-    103,
-    232,
-    249,
-    0.1
-  ); /* Use the --ring color with opacity for hover */
+  background-color: rgba(103,
+      232,
+      249,
+      0.1);
+  /* Use the --ring color with opacity for hover */
 }
+
 /* ========================================= */
 /* MEDIA QUERIES (Responsive Design)       */
 /* ========================================= */
 @media (hover: none) and (pointer: coarse) {
+
   /* --- MOBILE #cursor-light --- */
   #cursor-light {
-    display: block !important; /* Ensure it's displayed */
-    opacity: 1 !important; /* Make it always visible */
-    top: 50%; /* Center vertically */
-    left: 50%; /* Center horizontally */
+    display: block !important;
+    /* Ensure it's displayed */
+    opacity: 1 !important;
+    /* Make it always visible */
+    top: 50%;
+    /* Center vertically */
+    left: 50%;
+    /* Center horizontally */
     /* Center element precisely and set base scale */
     transform: translate(-50%, -50%) scale(1);
-    /* Add transition for transform changes during scroll effect */
+    /* Remove transition on transform for this base state */
+    /* Transition only needed for background/theme changes */
     transition: opacity var(--transition-duration-base) var(--transition-easing),
-      transform 0.4s var(--transition-easing-out),
-      /* For the 'dance' */ background var(--transition-duration-base)
-        var(--transition-easing); /* Theme transition */
+      /* transform removed from here */
+      background var(--transition-duration-base) var(--transition-easing);
+    /* Theme transition */
   }
 
   /* Optional: Style for the "dancing" state triggered by JS */
   #cursor-light.is-dancing {
-    transform: translate(-50%, -50%) scale(1.15); /* Pulse bigger */
+    animation: pulse 0.4s ease-out forwards;
     /* You could also subtly change opacity or intensity here if desired */
     /* opacity: 0.9; */
   }
+
   /* --- End MOBILE #cursor-light --- */
 
   /* --- Other Mobile overrides (like disabling desktop hover) --- */
   .prayer-card.active {
     /* Keep previous active card pulse or remove if distracting */
     /* animation: mobile-active-glow 2.2s infinite ease-in-out; */
-    transform: none !important; /* Still important to prevent desktop hover transforms */
+    transform: none !important;
+    /* Still important to prevent desktop hover transforms */
   }
+
   .prayer-card:hover {
     box-shadow: var(--shadow-sm);
     transform: none;
   }
+
   .prayer-card.active:hover {
-    box-shadow: none; /* Let active styles/animations control */
+    box-shadow: var(--shadow-md);
+    /* Keep active shadow */
     transform: none;
   }
+
   .prayer-card::before {
+    /* Ensure desktop glow is off on mobile */
     opacity: 0 !important;
   }
 }
@@ -1222,11 +1299,12 @@ html.dark-theme .offline-container .retry-button:hover {
   .next-prayer-info .countdown {
     font-size: var(--font-size-2xl);
   }
+
   .next-prayer-info .countdown-description {
-    font-size: var(--font-size-sm); /* Smaller than main countdown */
-    color: var(--muted-foreground); /* Use muted color */
-    margin-top: var(--gap-sm); /* Add some space */
-    min-height: 1.2em; /* Prevent layout jump when empty */
+    font-size: var(--font-size-sm);
+    color: var(--muted-foreground);
+    margin-top: var(--gap-sm);
+    min-height: 1.2em;
     line-height: 1.4;
     font-weight: var(--font-weight-medium);
     transition: color var(--transition-duration-fast) var(--transition-easing);
@@ -1235,18 +1313,19 @@ html.dark-theme .offline-container .retry-button:hover {
   /* Ensure skeleton style applies */
   .countdown-description.skeleton-text {
     color: var(--muted-foreground) !important;
-    /* content: '...'; Optional placeholder */
-    /* Or keep background/color changes consistent with other skeletons */
-    background-color: var(--secondary); /* Example skeleton background */
-    border-radius: var(--radius-xs);
-    width: 60%; /* Example width */
+    background-color: transparent;
+    /* Clear any skeleton bg if not needed */
+    width: 60%;
     margin-left: auto;
     margin-right: auto;
     opacity: 0.5;
   }
+
   .countdown-description.skeleton-text:empty::before {
-    content: "\00a0"; /* Non-breaking space to give it height */
+    content: "\00a0";
+    /* Non-breaking space to give it height */
   }
+
   .themeToggle-container {
     top: 0.75rem;
     left: 1rem;
@@ -1256,13 +1335,16 @@ html.dark-theme .offline-container .retry-button:hover {
     width: 90%;
     bottom: 0.75rem;
   }
+
   .forecast-button {
     font-size: var(--font-size-sm);
     padding: 0.5rem 1rem;
   }
+
   .forecast-table {
     font-size: var(--font-size-xs);
   }
+
   .forecast-table th,
   .forecast-table td {
     padding: var(--gap-sm) var(--gap-sm);
@@ -1294,6 +1376,7 @@ html.dark-theme .offline-container .retry-button:hover {
     max-width: 100%;
     /* Ensure fits within container */
   }
+
   .table-warpper {
     border: none;
   }

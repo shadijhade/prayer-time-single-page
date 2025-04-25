@@ -1,7 +1,7 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.3"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
-const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.1";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.3.1.1"; // <<<--- INCREMENT THIS IF YOU MAKE SIGNIFICANT SW CHANGES
+const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.1.1";
 const OFFLINE_URL = "offline.html";
 
 const APP_SHELL_ASSETS = [

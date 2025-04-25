@@ -23,6 +23,8 @@
   const REVERSE_GEOCODE_TIMEOUT_MS = 10000; // 10 seconds
   const PRAYER_TIME_RECALC_DELAY_MS = 1500; // Delay before refreshing after prayer time passes
   const CALCULATION_RENDER_DELAY_MS = 50; // Small delay to allow skeleton UI render
+  const MOBILE_SCROLL_THROTTLE_MS = 100; // Throttle for mobile scroll effect
+  const MOBILE_PULSE_ANIMATION_DURATION_MS = 400; // Match CSS animation
 
   // --- API & Paths ---
   const REVERSE_GEOCODE_URL =
@@ -38,7 +40,8 @@
   const CSS_SKELETON = "skeleton";
   const CSS_SKELETON_TEXT = "skeleton-text";
   const CSS_TOAST_SHOW = "show";
-  // Selectors (using const for clarity, though might be slightly overkill vs. direct strings)
+  const CSS_MOBILE_DANCING = "is-dancing"; // Class for mobile scroll animation
+  // Selectors
   const SEL_METHOD_BTN = ".method-btn";
   const SEL_PRAYER_CARD = ".prayer-card";
   const SEL_PRAYER_TIME = ".prayer-time";
@@ -47,16 +50,16 @@
   const SEL_TOAST_CLOSE = ".toast-close";
   const SEL_BTN_TEXT = ".btn-text";
 
-  // --- Icon Strings (Keep as strings for easy embedding) ---
-  const ICON_SPINNER = `<span class="material-symbols-rounded icon-spin" aria-hidden="true">progress_activity</span>`; // Or autorenew, sync
-  const ICON_ERROR = `<span class="material-symbols-rounded icon-error" aria-hidden="true">error</span>`; // Or cancel
+  // --- Icon Strings ---
+  const ICON_SPINNER = `<span class="material-symbols-rounded icon-spin" aria-hidden="true">progress_activity</span>`;
+  const ICON_ERROR = `<span class="material-symbols-rounded icon-error" aria-hidden="true">error</span>`;
   const ICON_WARNING = `<span class="material-symbols-rounded icon-warning" aria-hidden="true">warning</span>`;
   const ICON_SUCCESS = `<span class="material-symbols-rounded icon-success" aria-hidden="true">check_circle</span>`;
   const ICON_INFO = `<span class="material-symbols-rounded icon-info" aria-hidden="true">info</span>`;
-  const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`; // Match button icon
+  const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`;
 
   // --- Notification Constants ---
-  const NOTIFICATION_ICON_PATH = "web-app-manifest-192x192.png"; // Match SW
+  const NOTIFICATION_ICON_PATH = "web-app-manifest-192x192.png";
   const PRE_NOTIFICATION_MINUTES = 10;
   const PRAYER_NOTIFICATION_TAG_PREFIX = "prayer-";
 
@@ -129,16 +132,17 @@
   //          Application State
   // ==============================================
   const appState = {
-    loadingToastElement: null, // Reference to the persistent loading toast
-    toastContainerElement: null, // Reference to the toast container div
+    loadingToastElement: null,
+    toastContainerElement: null,
     countdownIntervalId: null,
-    currentLocation: null, // { latitude: number, longitude: number, source: 'user' | 'cache' | ... }
-    currentPrayerTimes: null, // Instance of adhan.PrayerTimes
-    isMouseEffectEnabled: false, // Track mouse effect state
-    mouseEffectRAFId: null, // requestAnimationFrame ID for mouse effect
-    lastKnownCurrentPrayer: null, // Last known adhan.Prayer enum (for optimizing highlight updates)
-    isUpdateAvailable: false, // Flag if SW update is pending user action
-    waitingServiceWorker: null, // Reference to the waiting SW instance
+    currentLocation: null,
+    currentPrayerTimes: null,
+    isMouseEffectEnabled: false,
+    mouseEffectRAFId: null,
+    // lastKnownCurrentPrayer: null, // *** REMOVED: No longer needed for highlight logic ***
+    isUpdateAvailable: false,
+    waitingServiceWorker: null,
+    mobileScrollThrottleTimeout: null, // Timeout ID for scroll throttling
   };
 
   // ==============================================
@@ -579,7 +583,7 @@
       handleLocationError,
       {
         timeout: GEOLOCATION_TIMEOUT_MS,
-        enableHighAccuracy: false, // Usually sufficient and faster/less power
+        enableHighAccuracy: true, // Usually sufficient and faster/less power
         maximumAge: GEOLOCATION_MAX_AGE_MS,
       }
     );
@@ -639,7 +643,7 @@
       default:
         userMessage = `حدث خطأ غير معروف في تحديد الموقع (${error.code}).`;
     }
-    showToast(userMessage, "error", 5000);
+    showToast(userMessage, "error", 0);
 
     // Reset UI state
     if (domRefs.locationSpan) domRefs.locationSpan.textContent = "---";
@@ -1214,78 +1218,82 @@
       console.error(
         "Cannot display times: Missing container, times object, or Adhan library."
       );
-      setPrayerTimesSkeletonState(true); // Reset to skeleton
-      domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // Not busy (error state)
+      setPrayerTimesSkeletonState(true);
+      domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false");
       return;
     }
 
-    let currentPrayerEnum = adhan.Prayer.None;
+    // *** CHANGE START: Determine the NEXT prayer to highlight ***
     let nextPrayerEnum = adhan.Prayer.None;
+    let activePrayerKey = null; // Key of the prayer to make active ('fajr', 'dhuhr', etc.)
     const now = new Date();
 
     try {
-      currentPrayerEnum = prayerTimes.currentPrayer(now);
       nextPrayerEnum = prayerTimes.nextPrayer(now);
-    } catch (e) {
-      console.error("Error getting current/next prayer enum from Adhan.js:", e);
-      // Continue gracefully, defaults (None) will be used
-    }
 
-    // Store the current prayer to optimize countdown highlight updates
-    appState.lastKnownCurrentPrayer = currentPrayerEnum;
+      // If next prayer is None, it means Isha has passed, and the next one is tomorrow's Fajr
+      if (nextPrayerEnum === adhan.Prayer.None) {
+        activePrayerKey = "fajr"; // Highlight Fajr card
+      } else {
+        activePrayerKey = nextPrayerEnum; // Highlight the actual next prayer
+      }
+      console.log(
+        `Next prayer determined as: ${nextPrayerEnum}, Highlighting card: ${activePrayerKey}`
+      );
+    } catch (e) {
+      console.error("Error getting next prayer enum from Adhan.js:", e);
+      activePrayerKey = null; // Don't highlight anything on error
+    }
+    // *** CHANGE END ***
 
     // --- Update Prayer Cards ---
-    // Efficiently update cards without querying inside the loop
     PRAYER_DISPLAY_ORDER.forEach((prayerKey) => {
       const card = container.querySelector(
         `${SEL_PRAYER_CARD}[data-prayer="${prayerKey}"]`
       );
       if (!card) {
         console.warn(`Prayer card element not found for: ${prayerKey}`);
-        return; // Skip this card if missing
+        return;
       }
 
-      const prayerTimeDate = prayerTimes[prayerKey]; // Access time via property name
+      const prayerTimeDate = prayerTimes[prayerKey];
       const timeEl = card.querySelector(SEL_PRAYER_TIME);
       const remainingEl = card.querySelector(SEL_PRAYER_REMAINING);
 
       // Reset card state before applying new state
       card.classList.remove(CSS_ACTIVE, CSS_SKELETON);
       if (timeEl) timeEl.classList.remove(CSS_SKELETON);
-      if (remainingEl) remainingEl.textContent = ""; // Clear remaining time text
+      if (remainingEl) remainingEl.textContent = ""; // Always clear remaining text initially for this setup
 
       if (isValidDate(prayerTimeDate)) {
-        // Set the prayer time text
         if (timeEl) timeEl.textContent = formatTimeForDisplay(prayerTimeDate);
 
-        // Check if this prayer is the current one
-        const isCurrentPrayer = prayerKey === currentPrayerEnum;
-        if (isCurrentPrayer) {
+        // *** CHANGE: Highlight the card if it matches the ACTIVE prayer key ***
+        const isActivePrayer = prayerKey === activePrayerKey;
+        if (isActivePrayer) {
           card.classList.add(CSS_ACTIVE);
-          if (remainingEl) {
-            remainingEl.textContent = "حان وقت الصلاة الآن";
-          }
+          // Note: No text is set in remainingEl for the active *upcoming* prayer
+          // The main countdown shows the time remaining.
         }
+        // *** CHANGE END ***
       } else {
-        // Handle invalid/missing time for this prayer
+        // Handle invalid/missing time
         if (timeEl) {
           timeEl.textContent = "--:--";
-          timeEl.classList.add(CSS_SKELETON); // Show as skeleton if time is invalid
+          timeEl.classList.add(CSS_SKELETON);
         }
-        if (remainingEl) remainingEl.textContent = ""; // Ensure remaining text is cleared
+        if (remainingEl) remainingEl.textContent = "";
         console.warn(`Invalid or missing time for prayer: ${prayerKey}`);
       }
     });
 
-    // --- Update Next Prayer Info Section ---
+    // --- Update Next Prayer Info Section (uses nextPrayerEnum directly) ---
     updateNextPrayerDisplay(prayerTimes, nextPrayerEnum, now);
 
-    // Mark overall display as loaded (remove skeleton classes)
+    // Mark overall display as loaded
     setPrayerTimesSkeletonState(false);
-    // Set aria-busy false AFTER content is potentially populated
     domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false");
   }
-
   /**
    * Updates the display area showing the name of the next prayer.
    * @param {adhan.PrayerTimes} prayerTimes - The current prayer times object (needed for tomorrow's Fajr).
@@ -1294,39 +1302,33 @@
    */
   function updateNextPrayerDisplay(prayerTimes, nextPrayerEnum, now) {
     const nextPrayerEl = domRefs.nextPrayerName;
-    // **Accessibility:** Add aria-live="polite" aria-atomic="true" to the HTML #next-prayer-name element
-    // <span id="next-prayer-name" aria-live="polite" aria-atomic="true">---</span>
     if (!nextPrayerEl || typeof adhan === "undefined") return;
 
-    let nextPrayerText = "خطأ"; // Default/error text
+    let nextPrayerText = "خطأ";
 
     try {
       if (nextPrayerEnum === adhan.Prayer.None) {
-        // Isha has passed, next prayer is tomorrow's Fajr
         const tomorrowFajrTime = getTomorrowFajrTime(
           prayerTimes.coordinates,
           prayerTimes.calculationParameters
         );
         if (tomorrowFajrTime) {
-          // Explicitly mention it's tomorrow
           nextPrayerText = PRAYER_NAMES_AR.fajr + " (غداً)";
         } else {
-          nextPrayerText = "خطأ في حساب الفجر"; // More specific error
+          nextPrayerText = "خطأ في حساب الفجر";
         }
       } else {
-        // Get the Arabic name from our map, fallback to the enum key if not found
         nextPrayerText = PRAYER_NAMES_AR[nextPrayerEnum] || nextPrayerEnum;
       }
-
       nextPrayerEl.textContent = nextPrayerText;
-      nextPrayerEl.classList.remove(CSS_SKELETON_TEXT); // Ensure skeleton class is removed
+      nextPrayerEl.classList.remove(CSS_SKELETON_TEXT);
     } catch (e) {
       console.error(
         "Error determining or setting next prayer name display:",
         e
       );
-      nextPrayerEl.textContent = "خطأ"; // Fallback text on error
-      nextPrayerEl.classList.add(CSS_SKELETON_TEXT); // Indicate error state visually
+      nextPrayerEl.textContent = "خطأ";
+      nextPrayerEl.classList.add(CSS_SKELETON_TEXT);
     }
   }
   /**
@@ -1393,14 +1395,9 @@
 
   /** Starts the countdown timer to the next prayer. */
   function startCountdown() {
-    stopCountdown(); // Ensure no previous interval is running
+    stopCountdown();
 
-    // Check required elements and state
-    if (
-      !domRefs.countdown ||
-      !domRefs.nextPrayerName ||
-      !domRefs.prayerTimesContainer
-    ) {
+    if (!domRefs.countdown || !domRefs.nextPrayerName) {
       console.error(
         "Cannot start countdown: Required DOM elements are missing."
       );
@@ -1411,29 +1408,16 @@
       !appState.currentPrayerTimes.coordinates ||
       !appState.currentPrayerTimes.calculationParameters
     ) {
-      console.error(
-        "Cannot start countdown: Prayer times data with coordinates/parameters is missing."
-      );
-      updateCountdownDisplay(-1); // Show error state
+      console.error("Cannot start countdown: Prayer times data is missing.");
+      updateCountdownDisplay(-1);
       return;
     }
 
-    // Cache prayer card elements *once* before starting the interval for performance
-    const prayerCardsMap = new Map(); // Use a Map for easier lookup by prayerKey
-    domRefs.prayerTimesContainer
-      .querySelectorAll(SEL_PRAYER_CARD)
-      .forEach((card) => {
-        const key = card.getAttribute("data-prayer");
-        if (key) prayerCardsMap.set(key, card);
-      });
+    // *** REMOVED: Caching prayerCardsMap as it's no longer used in updateCountdownTick for highlighting ***
 
-    // The function that runs every second
     function updateCountdownTick() {
-      // Re-check essential data; it might have been cleared by an error elsewhere
       if (!appState.currentPrayerTimes || typeof adhan === "undefined") {
-        handleCountdownError(
-          "Prayer times data or Adhan library became unavailable during countdown."
-        );
+        handleCountdownError("Prayer times data or Adhan library unavailable.");
         return;
       }
 
@@ -1441,58 +1425,41 @@
       let nextPrayerEnum = adhan.Prayer.None;
       let nextPrayerTime = null;
       let timeDifferenceMillis = -1;
-      let isNextPrayerTomorrow = false; // Flag for display logic
+      let isNextPrayerTomorrow = false;
 
       try {
-        // Ensure coordinates and parameters are still valid (defensive check)
         if (
           !appState.currentPrayerTimes.coordinates ||
           !appState.currentPrayerTimes.calculationParameters
         ) {
-          throw new Error(
-            "Missing coordinates or parameters in currentPrayerTimes state."
-          );
+          throw new Error("Missing coordinates or parameters.");
         }
 
-        // Determine the next prayer based on the current time
         nextPrayerEnum = appState.currentPrayerTimes.nextPrayer(now);
 
         if (nextPrayerEnum === adhan.Prayer.None) {
-          // If nextPrayer is None, it means Isha has passed. Calculate tomorrow's Fajr.
           nextPrayerTime = getTomorrowFajrTime(
             appState.currentPrayerTimes.coordinates,
             appState.currentPrayerTimes.calculationParameters
           );
           if (!nextPrayerTime) {
-            // This should ideally not happen if calculation worked initially, but handle it.
-            throw new Error(
-              "Failed to calculate tomorrow's Fajr time for countdown."
-            );
+            throw new Error("Failed to calculate tomorrow's Fajr time.");
           }
-          isNextPrayerTomorrow = true; // Mark that the target is tomorrow
+          isNextPrayerTomorrow = true;
         } else {
-          // Get the time for the determined next prayer
           nextPrayerTime =
             appState.currentPrayerTimes.timeForPrayer(nextPrayerEnum);
           if (!isValidDate(nextPrayerTime)) {
-            // This indicates a potential issue with Adhan.js or the input data
-            throw new Error(
-              `Invalid Date object received for next prayer: ${nextPrayerEnum}`
-            );
+            throw new Error(`Invalid Date for next prayer: ${nextPrayerEnum}`);
           }
         }
 
-        // Calculate the difference in milliseconds
         timeDifferenceMillis = nextPrayerTime.getTime() - now.getTime();
       } catch (e) {
-        // Catch errors specifically from time calculation/retrieval within the tick
-        handleCountdownError(
-          `Error during countdown time calculation: ${e.message}`
-        );
-        return; // Stop this tick's execution
+        handleCountdownError(`Error calculating time: ${e.message}`);
+        return;
       }
 
-      // Check if the prayer time has been reached or passed
       if (timeDifferenceMillis <= 0) {
         if (domRefs.countdownDescription) {
           domRefs.countdownDescription.textContent = "حان وقت الصلاة الآن";
@@ -1503,47 +1470,34 @@
       }
 
       // --- Update UI Elements ---
-
-      // 1. Update the main countdown timer display (e.g., HH:MM:SS)
-      updateCountdownDisplay(timeDifferenceMillis / 1000); // Convert ms to seconds
-      // 1.5 Update the countdown description
+      updateCountdownDisplay(timeDifferenceMillis / 1000);
       if (domRefs.countdownDescription) {
-        const totalSeconds = Math.floor(timeDifferenceMillis / 1000);      
+        const totalSeconds = Math.floor(timeDifferenceMillis / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = Math.floor(totalSeconds % 60); // Still need seconds for "less than a minute" case
-        // 👇 Use the new function here 👇
+        const seconds = Math.floor(totalSeconds % 60);
         const descriptionText = formatHoursMinutesText(hours, minutes, seconds);
         domRefs.countdownDescription.textContent = descriptionText;
         domRefs.countdownDescription.classList.remove(CSS_SKELETON_TEXT);
       }
-      // 2. Update the "Next Prayer" name display (only if needed)
-      // This check prevents unnecessary DOM updates if the name hasn't changed.
+
       const expectedNextPrayerName = isNextPrayerTomorrow
         ? PRAYER_NAMES_AR.fajr + " (غداً)"
-        : PRAYER_NAMES_AR[nextPrayerEnum] || nextPrayerEnum; // Use map or fallback to key
+        : PRAYER_NAMES_AR[nextPrayerEnum] || nextPrayerEnum;
 
       if (
         domRefs.nextPrayerName &&
         domRefs.nextPrayerName.textContent !== expectedNextPrayerName
       ) {
         domRefs.nextPrayerName.textContent = expectedNextPrayerName;
-        domRefs.nextPrayerName.classList.remove(CSS_SKELETON_TEXT); // Ensure no skeleton style
-        console.log(
-          "Next prayer name display updated to:",
-          expectedNextPrayerName
-        ); // Debug log
+        domRefs.nextPrayerName.classList.remove(CSS_SKELETON_TEXT);
+        console.log("Next prayer name updated to:", expectedNextPrayerName);
       }
 
-      // 3. Update the currently active prayer card highlighting
-      // This only performs DOM changes if the *current* prayer has changed since the last check.
-      updateActiveCardHighlight(now, prayerCardsMap);
+      // *** REMOVED: Call to updateActiveCardHighlight as highlighting is handled by displayPrayerTimes ***
     } // --- End of updateCountdownTick function ---
 
-    // --- Start the Interval ---
-    // Initial immediate call to set the display right away
     updateCountdownTick();
-    // Set up the interval to run the tick function every second
     appState.countdownIntervalId = setInterval(updateCountdownTick, 1000);
     console.log("Countdown started.");
   }
@@ -1914,49 +1868,42 @@
 
   /** Sets up the background glow effect that reacts to scroll on mobile. */
   function setupMobileScrollEffect(lightElement, mainArea) {
-    // Basic throttle function
-    let throttleTimeout = null;
-    const throttleDelay = 100; // ms - Adjust as needed
-
+    // Throttle function remains the same
     function throttle(callback, delay) {
-      if (throttleTimeout) return; // Don't run if already waiting
-      throttleTimeout = setTimeout(() => {
+      if (appState.mobileScrollThrottleTimeout) return;
+      appState.mobileScrollThrottleTimeout = setTimeout(() => {
         callback();
-        throttleTimeout = null; // Clear timeout after execution
+        appState.mobileScrollThrottleTimeout = null;
       }, delay);
     }
 
-    // Timeout for removing the 'dancing' class
-    let danceTimeout = null;
-    const danceDuration = 400; // ms - Should match CSS transition duration
-
+    // *** CHANGE START: Modified scroll handler ***
     function handleScroll() {
-      // Apply the dancing effect
-      lightElement.classList.add("is-dancing");
+      // Remove the class briefly to allow re-triggering animation
+      lightElement.classList.remove(CSS_MOBILE_DANCING);
 
-      // Clear any existing timeout to remove the class
-      if (danceTimeout) {
-        clearTimeout(danceTimeout);
-      }
+      // Force browser reflow/repaint - reading offsetWidth is a common trick
+      // This ensures the class removal is processed before adding it back.
+      void lightElement.offsetWidth;
 
-      // Set a new timeout to remove the class after the animation duration
-      danceTimeout = setTimeout(() => {
-        lightElement.classList.remove("is-dancing");
-        danceTimeout = null;
-      }, danceDuration);
+      // Add the class back to trigger the CSS animation (defined in style.css)
+      lightElement.classList.add(CSS_MOBILE_DANCING);
+
+      // No timeout needed here - CSS animation handles the duration
     }
+    // *** CHANGE END ***
 
     // Add MOBILE scroll listener with throttling
     window.addEventListener(
       "scroll",
       () => {
-        throttle(handleScroll, throttleDelay);
+        throttle(handleScroll, MOBILE_SCROLL_THROTTLE_MS); // Use constant for throttle delay
       },
       { passive: true }
     );
 
     // No need to set initial styles here, CSS media query handles it
-    console.log("Mobile scroll effect listener attached.");
+    console.log("Mobile scroll effect listener attached (Pulse Animation).");
   }
 
   /**
