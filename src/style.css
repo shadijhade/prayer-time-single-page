@@ -1444,9 +1444,9 @@ html.dark-theme .offline-container .retry-button:hover {
   }
 
   .prayer-times-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     /* Stack cards */
-    gap: var(--gap-lg);
+    gap: var(--gap-sm);
   }
 
   /* Card padding adjusted via --card-padding variable */
@@ -1505,5 +1505,11 @@ html.dark-theme .offline-container .retry-button:hover {
 
   #update-notification button {
     padding: 0.3rem 0.6rem;
+  }
+}
+@media (max-width: 350px) {
+  .prayer-times-container {
+    grid-template-columns: 1fr;
+    gap: var(--gap-lg);
   }
 }
