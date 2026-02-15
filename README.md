@@ -1,4 +1,4 @@
-# Prayer Times PWA (مواقيت الصلاة)
+# <img src="src/favicon.svg" width="32" height="32" style="vertical-align: middle;"> Prayer Times PWA (مواقيت الصلاة)
 
 A lightweight, accurate, and offline-capable Progressive Web Application (PWA) for displaying prayer times, Hijri/Gregorian dates, and countdowns to the next prayer. Built with performance and user experience in mind.
 
@@ -10,6 +10,15 @@ A lightweight, accurate, and offline-capable Progressive Web Application (PWA) f
 - **Customizable**: Supports multiple calculation methods (Muslim World League, Umm Al-Qura, ISNA, etc.).
 - **Themes**: Dark and Light mode support.
 - **Arabic UI**: Designed with a clean Arabic interface (Right-to-Left).
+
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="resources/screenshot-light.png" width="45%" alt="Light Mode">
+  &nbsp; &nbsp;
+  <img src="resources/screenshot-dark.png" width="45%" alt="Dark Mode">
+</p>
 
 ## 🛠 Technologies Used
 
