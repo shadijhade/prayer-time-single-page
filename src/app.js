@@ -12,26 +12,31 @@
   const STORAGE_KEY_METHOD_CHOICE = "methodChoice"; // Saved only when the user picks a method
   const STORAGE_KEY_MADHAB_CHOICE = "madhabChoice"; // Saved only when the user picks the Asr madhab
   const STORAGE_KEY_LAST_LOCATION = "lastKnownLocation";
+  // Older versions cached reverse-geocode lookups under this prefix; they're deleted on start
   const STORAGE_KEY_LOCATION_CACHE_PREFIX = "locationDataCache_";
 
   // --- Default Values ---
-  const DEFAULT_PRAYER_METHOD = "MuslimWorldLeague";
+  // Country defaults and the Adhan.js setup live in prayer-rules.js (loaded first)
+  const DEFAULT_PRAYER_METHOD = prayerRules.DEFAULT_METHOD;
 
   // --- Timing & Duration ---
   const TOAST_TRANSITION_DURATION_MS = 350; // Match CSS transition
-  const GEOLOCATION_TIMEOUT_MS = 15000; // Increased timeout
-  const GEOLOCATION_MAX_AGE_MS = 300000; // 5 minutes
-  const LOCATION_CACHE_EXPIRY_MS = 360 * 24 * 60 * 60 * 1000; // 360 days
-  const REVERSE_GEOCODE_TIMEOUT_MS = 10000; // 10 seconds
   const PRAYER_STARTED_MESSAGE_MS = 60000; // "حان الآن وقت صلاة ..." shows for the first minute
+  // A coarse (Wi-Fi/cell) position arrives quickly and is plenty to find the city
+  const GEOLOCATION_OPTIONS = {
+    enableHighAccuracy: false,
+    timeout: 15000,
+    maximumAge: 5 * 60 * 1000,
+  };
 
-  // --- API & Paths ---
-  const REVERSE_GEOCODE_URL =
-    "https://api.bigdatacloud.net/data/reverse-geocode-client";
-  const SERVICE_WORKER_PATH = "sw.js"; // Ensure this path is correct
+  // --- Paths ---
+  const SERVICE_WORKER_PATH = "sw.js";
+  const CITIES_PATH = "cities/"; // Built from GeoNames by scripts/build-cities.py
 
-  // --- Caching ---
-  const LOCATION_CACHE_PRECISION = 3; // Decimal places for lat/lon rounding (approx 111m)
+  // --- City Centres ---
+  // Times are calculated for the user's city centre, like the timetables mosques publish
+  const CITY_SNAP_RADIUS_KM = 15; // The most populous place this close is the user's city
+  const CITY_MAX_DISTANCE_KM = 30; // Farther than this from every city: use the position itself
 
   // --- CSS Classes & Selectors ---
   const CSS_DARK_THEME = "dark-theme";
@@ -50,12 +55,15 @@
   const SEL_BTN_TEXT = ".btn-text";
 
   // --- Icon Strings ---
-  const ICON_SPINNER = `<span class="material-symbols-rounded icon-spin" aria-hidden="true">progress_activity</span>`;
-  const ICON_ERROR = `<span class="material-symbols-rounded icon-error" aria-hidden="true">error</span>`;
-  const ICON_WARNING = `<span class="material-symbols-rounded icon-warning" aria-hidden="true">warning</span>`;
-  const ICON_SUCCESS = `<span class="material-symbols-rounded icon-success" aria-hidden="true">check_circle</span>`;
-  const ICON_INFO = `<span class="material-symbols-rounded icon-info" aria-hidden="true">info</span>`;
-  const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`;
+  // Icons are <symbol>s in index.html's sprite (#icon-<name>)
+  const svgIcon = (name, className = "") =>
+    `<svg class="icon ${className}" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
+  const ICON_SPINNER = svgIcon("progress_activity", "icon-spin");
+  const ICON_ERROR = svgIcon("error", "icon-error");
+  const ICON_WARNING = svgIcon("warning", "icon-warning");
+  const ICON_SUCCESS = svgIcon("check_circle", "icon-success");
+  const ICON_INFO = svgIcon("info", "icon-info");
+  const ICON_LOCATION = svgIcon("my_location");
 
   // --- Prayer Data ---
   const PRAYER_NAMES_AR = {
@@ -84,53 +92,6 @@
     { month: 10, day: 1, name: "عيد الفطر", greeting: "عيد فطر مبارك" },
     { month: 12, day: 10, name: "عيد الأضحى", greeting: "عيد أضحى مبارك" },
   ];
-  // Maps country codes (ISO 3166-1 alpha-2) to Adhan.js method names
-  const COUNTRY_TO_METHOD_MAP = {
-    SA: "UmmAlQura",
-    EG: "Egyptian",
-    US: "ISNA",
-    CA: "ISNA",
-    GB: "MuslimWorldLeague",
-    FR: "MuslimWorldLeague",
-    DE: "MuslimWorldLeague",
-    PK: "Karachi",
-    IR: "Tehran",
-    KW: "Kuwait",
-    QA: "Qatar",
-    AE: "Dubai",
-    SG: "Singapore",
-    MY: "Singapore",
-    ID: "Singapore",
-    TR: "Turkey",
-    BD: "Karachi",
-    IN: "Karachi",
-    AF: "Karachi",
-    SY: "Egyptian",
-    LB: "Egyptian",
-    TN: "Karachi",
-    DZ: "MuslimWorldLeague",
-    MA: "Egyptian",
-    JO: "Karachi",
-    IQ: "MuslimWorldLeague",
-    YE: "UmmAlQura",
-    OM: "UmmAlQura",
-    BH: "UmmAlQura",
-    RU: "MuslimWorldLeague",
-    KZ: "MuslimWorldLeague",
-    UZ: "MuslimWorldLeague",
-    TH: "MuslimWorldLeague",
-    VN: "MuslimWorldLeague",
-    BR: "MuslimWorldLeague",
-    AR: "MuslimWorldLeague",
-    AU: "MuslimWorldLeague",
-    NZ: "MuslimWorldLeague",
-    ZA: "Egyptian",
-    NG: "Egyptian",
-    KE: "Egyptian",
-    DEFAULT: "MuslimWorldLeague",
-  };
-  // Countries whose mosques use the Hanafi (later) Asr by default
-  const HANAFI_COUNTRIES = ["PK", "IN", "BD", "AF"];
 
   // ==============================================
   //          Application State
@@ -150,6 +111,7 @@
     mouseEffectRAFId: null,
     isUpdateAvailable: false,
     waitingServiceWorker: null,
+    pickerCities: null, // { countryCode, tz, cities } of the country shown in the city picker
   };
 
   // ==============================================
@@ -199,6 +161,11 @@
     domRefs.forecastContainer = document.getElementById(
       "forecast-table-container"
     );
+    domRefs.citySheet = document.getElementById("city-sheet");
+    domRefs.cityForm = document.getElementById("city-form");
+    domRefs.countrySelect = document.getElementById("country-select");
+    domRefs.cityInput = document.getElementById("city-input");
+    domRefs.cityList = document.getElementById("city-list");
   }
 
   // ==============================================
@@ -209,11 +176,34 @@
     Intl.DurationFormat &&
     new Intl.DurationFormat("ar-u-nu-latn", { style: "long" });
 
-  // Umm al-Qura month number of a date ("9" in Ramadan)
-  const hijriMonthFormat = new Intl.DateTimeFormat(
-    `en-u-ca-${HIJRI_CALENDAR}`,
-    { month: "numeric" }
-  );
+  const countryNames = new Intl.DisplayNames(["ar"], { type: "region" });
+
+  /**
+   * The time zone to show times in: a city picked by hand shows its own clock; otherwise the user
+   * is there, so the device's zone (undefined) is right and survives outdated time zone data.
+   */
+  const locationTimeZone = () =>
+    appState.currentLocation?.manual ? appState.currentLocation.timeZone : undefined;
+
+  const dayFormats = {}; // "YYYY-MM-DD" formatters by time zone
+  /**
+   * The calendar day it is in the location's time zone, as a local Date at noon: the form Adhan.js
+   * expects, and noon keeps DST shifts from moving it to another day.
+   * @param {Date} instant - Usually now.
+   * @param {number} [offsetDays=0] - Days to add.
+   * @returns {Date}
+   */
+  function locationDay(instant, offsetDays = 0) {
+    const timeZone = locationTimeZone();
+    dayFormats[timeZone] ??= new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const [year, month, day] = dayFormats[timeZone].format(instant).split("-");
+    return new Date(year, month - 1, Number(day) + offsetDays, 12);
+  }
 
   /**
    * Formats the remaining time as descriptive Arabic text, ignoring seconds.
@@ -279,6 +269,7 @@
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
+        timeZone: locationTimeZone(), // A city picked in another zone shows its own clock
       });
       // Note: Manual AM/PM replacement (ص/م) might be needed if the browser/OS
       // doesn't provide it correctly with 'ar' locale, but try Intl first.
@@ -598,48 +589,34 @@
     navigator.geolocation.getCurrentPosition(
       handleLocationSuccess,
       handleLocationError,
-      {
-        timeout: GEOLOCATION_TIMEOUT_MS,
-        enableHighAccuracy: true, // Usually sufficient and faster/less power
-        maximumAge: GEOLOCATION_MAX_AGE_MS,
-      }
+      GEOLOCATION_OPTIONS
     );
   }
 
   /**
-   * Success callback for geolocation.
+   * Success callback for geolocation: calculates for the user's city centre.
    * @param {GeolocationPosition} position - The position object from the browser.
    */
-  function handleLocationSuccess(position) {
-    // Update loading toast message
-    if (appState.loadingToastElement) {
-      const msgSpan =
-        appState.loadingToastElement.querySelector(SEL_TOAST_MESSAGE);
-      if (msgSpan)
-        msgSpan.textContent = "تم تحديد الموقع، جارِ جلب البيانات...";
-    } else {
-      // If toast was dismissed somehow, show a temporary success one
-      showToast("تم تحديد الموقع بنجاح.", "success", 2000);
-    }
-
+  async function handleLocationSuccess(position) {
     const { latitude, longitude } = position.coords;
-    // Same country as before until the reverse geocode says otherwise, so a failed lookup keeps the method
-    const countryCode = appState.currentLocation?.countryCode;
-    appState.currentLocation = { latitude, longitude, source: "user", countryCode };
-    console.log(
-      `Geolocation success: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-    );
-    saveLastLocation(
-      latitude,
-      longitude,
-      `موقع حالي: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
-      countryCode
-    );
-    fetchCountryAndDisplayPrayerTimes(latitude, longitude);
+    let location;
+    try {
+      location = await locateCity(latitude, longitude);
+    } catch (error) {
+      // Offline before the city files were ever cached: use the position, same country as before
+      console.error("City data unavailable:", error);
+      location = positionLocation(
+        latitude,
+        longitude,
+        appState.currentLocation?.countryCode
+      );
+    }
+    dismissLoadingToast(`تم تحديد الموقع: ${location.displayText}`);
+    setLocation(location);
   }
 
   /**
-   * Error callback for geolocation.
+   * Error callback for geolocation. Keeps the previous location's times, if any.
    * @param {GeolocationPositionError | {code: number, message: string}} error - The error object.
    */
   function handleLocationError(error) {
@@ -663,255 +640,231 @@
       default:
         userMessage = `حدث خطأ غير معروف في تحديد الموقع (${error.code}).`;
     }
-    showToast(userMessage, "error", 0);
+    showToast(`${userMessage} يمكنك اختيار مدينتك يدويًا.`, "error", 0);
 
-    // Reset UI state
-    if (domRefs.locationSpan) domRefs.locationSpan.textContent = "---";
+    if (appState.currentLocation) {
+      setLocation(appState.currentLocation);
+    } else {
+      if (domRefs.locationSpan) domRefs.locationSpan.textContent = "---";
+      setPrayerTimesSkeletonState(true); // Also stops the countdown and clears the times
+      domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // No longer busy (failed)
+    }
     enableLocationButton(true, "فشل، حاول مرة أخرى"); // Show error state on button
-    setPrayerTimesSkeletonState(true); // Reset times display to skeleton
-    domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // No longer busy (failed)
-    appState.currentLocation = null;
-    appState.currentPrayerTimes = null;
-    stopCountdown();
   }
 
+  // ==============================================
+  //          City Centres (GeoNames data in cities/)
+  // ==============================================
+
   /**
-   * Fetches country/locality, determines method, calculates and displays times.
-   * Handles caching of geocode data.
-   * @param {number} latitude
-   * @param {number} longitude
+   * Fetches cities/index.json (each country's bounding box) or a country's file,
+   * { tz: [time zones], cities: [[Arabic name or "", name, latitude, longitude, population, tz index]] }
+   * with the largest cities first. The service worker keeps them for offline use.
+   * @param {string} file - e.g. "index.json" or "EG.json".
    */
-  async function fetchCountryAndDisplayPrayerTimes(latitude, longitude) {
-    const apiUrl = `${REVERSE_GEOCODE_URL}?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`;
-    let locationDisplayText = `موقع: ${latitude.toFixed(
-      3
-    )}, ${longitude.toFixed(3)}`; // Default/fallback text
-    let geocodeData = null; // Holds fetched or cached reverse geocode data
+  async function fetchCityFile(file) {
+    const response = await fetch(CITIES_PATH + file);
+    if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
+    return response.json();
+  }
 
-    // --- Caching Logic ---
-    const cacheKey = getLocationCacheKey(latitude, longitude);
-    const cachedGeoItem = getCachedLocationData(cacheKey);
-    // --- End Caching Logic ---
+  /** Approximate distance in km, accurate enough over the few kilometres that matter here. */
+  function distanceKm(lat1, lon1, lat2, lon2) {
+    const dLon = ((lon2 - lon1 + 540) % 360) - 180; // The short way, also across the antimeridian
+    const x = dLon * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
+    return Math.hypot(x, lat2 - lat1) * 111.2;
+  }
 
-    if (cachedGeoItem) {
-      geocodeData = cachedGeoItem.data; // Use the data part of the cached item
-      console.log("Using cached location data.");
-      dismissLoadingToast(); // Dismiss spinner immediately
-      showToast("استخدام بيانات الموقع المخزنة.", "info", 2500);
-      // Update button state slightly delayed to feel natural after toast
-      setTimeout(() => {
-        if (domRefs.locationButton && domRefs.locationButton.disabled) {
-          domRefs.locationButton.innerHTML = `${ICON_LOCATION} <span class="${SEL_BTN_TEXT.substring(
-            1
-          )}"></span>`;
-          const textSpan = domRefs.locationButton.querySelector(SEL_BTN_TEXT);
-          if (textSpan) textSpan.textContent = "تم تحديد الموقع";
-          // Button will be fully re-enabled in calculateAndDisplayPrayerTimes
-        }
-      }, 300);
-      appState.currentLocation.source = "cache"; // Update source
-    } else {
-      // --- Fetch Logic ---
-      if (appState.loadingToastElement) {
-        const msgSpan =
-          appState.loadingToastElement.querySelector(SEL_TOAST_MESSAGE);
-        if (msgSpan) msgSpan.textContent = "جارِ تحديد الدولة والمنطقة...";
-      } else {
-        showToast("جارِ تحديد الدولة والمنطقة...", "loading", 0); // Ensure loading toast is shown
-      }
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          REVERSE_GEOCODE_TIMEOUT_MS
-        );
-
-        const response = await fetch(apiUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        geocodeData = await response.json(); // Store fetched data
-        setCachedLocationData(cacheKey, geocodeData); // Cache successful fetch
-        dismissLoadingToast("تم تحديد الدولة والمنطقة."); // Dismiss with success
-        showToast("جارِ حساب المواقيت...", "info", 1500); // Brief calculation message
-        appState.currentLocation.source = "network"; // Update source
-      } catch (error) {
-        dismissLoadingToast(); // Dismiss loading toast on fetch error
-        if (error.name === "AbortError") {
-          console.error("Reverse geocoding timed out:", error);
-          showToast("فشل تحديد الدولة (مهلة زائدة).", "warning", 5000);
-        } else {
-          console.error("Error fetching location name/country:", error);
-          showToast(
-            "فشل تحديد الدولة، سيتم استخدام الطريقة الافتراضية/المفضلة.",
-            "warning",
-            5000
-          );
-        }
-        locationDisplayText += " (فشل تحديد الدولة)";
-        // geocodeData remains null
-        appState.currentLocation.source = "error"; // Indicate failure
-      }
-      // --- End Fetch Logic ---
-    } // End if/else (cache hit/miss)
-
-    // --- Process Data (if available) ---
-    if (geocodeData) {
-      // Construct display text (use Set for unique parts)
-      const locationParts = [
-        geocodeData.locality,
-        geocodeData.city,
-        geocodeData.principalSubdivision, // e.g., state/province
-        geocodeData.countryName,
-      ].filter(Boolean); // Remove null/empty strings
-      const uniqueParts = [...new Set(locationParts)]; // Get unique values
-      locationDisplayText = uniqueParts.join("، ") || locationDisplayText; // Use fetched/cached or fallback
-
-      appState.currentLocation.countryCode =
-        geocodeData.countryCode?.toUpperCase() ||
-        appState.currentLocation.countryCode;
-      saveLastLocation(
-        latitude,
-        longitude,
-        locationDisplayText,
-        appState.currentLocation.countryCode
-      );
-    }
-    // --- End Processing ---
-
-    // --- Final UI Updates & Calculation ---
-    if (domRefs.locationSpan)
-      domRefs.locationSpan.textContent = locationDisplayText;
-    // Fill the dropdowns for this country (unless the user picked), then calculate with them
-    calculateAndDisplayPrayerTimes(
-      latitude,
-      longitude,
-      applyLocationDefaults(appState.currentLocation.countryCode)
+  /** Whether a position is in an index.json box; east exceeds 180 for boxes across the antimeridian. */
+  function isInBox([south, west, north, east], latitude, longitude) {
+    return (
+      latitude >= south &&
+      latitude <= north &&
+      [longitude, longitude + 360].some((lon) => lon >= west && lon <= east)
     );
   }
 
   /**
-   * Saves fetched geocode data to localStorage with a timestamp.
-   * @param {string} cacheKey - The key derived from lat/lon.
-   * @param {object} dataToCache - The geocode JSON data.
+   * Finds the user's city: the most populous place within CITY_SNAP_RADIUS_KM, else the nearest
+   * one within CITY_MAX_DISTANCE_KM.
+   * ponytail: country bounding boxes, so border areas load a few country files; tile the data if that gets slow
+   * @returns {Promise<object>} A location (see setLocation) at the city's centre, or at the
+   *   position itself when no city is close enough.
    */
-  function setCachedLocationData(cacheKey, dataToCache) {
+  async function locateCity(latitude, longitude) {
+    const index = await fetchCityFile("index.json");
+    const countries = await Promise.all(
+      Object.keys(index)
+        .filter((code) => isInBox(index[code], latitude, longitude))
+        .map(async (code) => ({ code, ...(await fetchCityFile(`${code}.json`)) }))
+    );
+    let largest = null;
+    let closest = null;
+    for (const { code, tz, cities } of countries) {
+      for (const row of cities) {
+        const city = {
+          row,
+          code,
+          tz,
+          distance: distanceKm(latitude, longitude, row[2], row[3]),
+        };
+        if (
+          city.distance <= CITY_SNAP_RADIUS_KM &&
+          (!largest || row[4] > largest.row[4])
+        ) {
+          largest = city;
+        }
+        if (!closest || city.distance < closest.distance) closest = city;
+      }
+    }
+    const city =
+      largest || (closest?.distance <= CITY_MAX_DISTANCE_KM ? closest : null);
+    if (city) return cityLocation(city.row, city.code, city.tz);
+    return {
+      ...positionLocation(latitude, longitude, closest?.code),
+      timeZone: closest?.tz[closest.row[5]],
+    };
+  }
+
+  /**
+   * A location at a city's centre.
+   * @param {Array} row - A row of a country file.
+   * @param {string} countryCode - The file's country (ISO 3166-1 alpha-2).
+   * @param {string[]} timeZones - The file's tz list.
+   */
+  function cityLocation(
+    [nameAr, name, latitude, longitude, , tzIndex],
+    countryCode,
+    timeZones
+  ) {
+    return {
+      latitude,
+      longitude,
+      countryCode,
+      timeZone: timeZones[tzIndex],
+      displayText: `${nameAr || name}، ${countryNames.of(countryCode)}`,
+    };
+  }
+
+  /** A location at the position itself, rounded to ~1 km, for when no city is close enough. */
+  function positionLocation(latitude, longitude, countryCode) {
+    return {
+      latitude: Math.round(latitude * 100) / 100,
+      longitude: Math.round(longitude * 100) / 100,
+      countryCode,
+      displayText: countryCode
+        ? `موقعك الحالي، ${countryNames.of(countryCode)}`
+        : "موقعك الحالي",
+    };
+  }
+
+  /**
+   * Shows, saves and calculates the times for a location.
+   * @param {{latitude: number, longitude: number, displayText: string, countryCode?: string,
+   *   timeZone?: string, manual?: boolean}} location - manual: picked by hand, so it's never moved automatically.
+   */
+  function setLocation(location) {
+    appState.currentLocation = location;
+    if (domRefs.locationSpan) domRefs.locationSpan.textContent = location.displayText;
     try {
-      const itemToStore = {
-        data: dataToCache,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(cacheKey, JSON.stringify(itemToStore));
-      console.log("Location data cached:", cacheKey);
+      localStorage.setItem(STORAGE_KEY_LAST_LOCATION, JSON.stringify(location));
     } catch (error) {
-      console.error("Error saving location data to localStorage:", error);
-      if (error.name === "QuotaExceededError") {
-        showToast(
-          "لا يمكن حفظ بيانات الموقع مؤقتًا (المساحة ممتلئة).",
-          "warning",
-          5000
+      console.error("Failed to save the location:", error);
+    }
+    updateDates(); // The header dates follow the location's time zone
+    calculateAndDisplayPrayerTimes(
+      location.latitude,
+      location.longitude,
+      applyLocationDefaults(location.countryCode)
+    );
+  }
+
+  /**
+   * On start, quietly moves an automatic location to the user's current city when location
+   * access was granted before, so travellers get the right times without pressing anything.
+   */
+  async function refreshCityInBackground() {
+    if (appState.currentLocation?.manual || !navigator.geolocation) return;
+    const permission = await navigator.permissions
+      ?.query({ name: "geolocation" })
+      .catch(() => null);
+    if (permission?.state !== "granted") return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const location = await locateCity(coords.latitude, coords.longitude).catch(
+          () => null
         );
-        // Consider implementing a basic cache eviction strategy here
-        // (e.g., remove the oldest 'locationDataCache_' item)
-      }
-    }
+        const current = appState.currentLocation;
+        if (!location || current?.manual) return;
+        if (
+          location.latitude === current?.latitude &&
+          location.longitude === current?.longitude
+        ) {
+          return;
+        }
+        setLocation(location);
+        showToast(`تم تحديث الموقع: ${location.displayText}`, "info");
+      },
+      () => {}, // Keep the saved location
+      GEOLOCATION_OPTIONS
+    );
   }
-  /**
-   * Saves the last known location coordinates and display text to localStorage.
-   * Includes basic error handling.
-   * @param {number} latitude
-   * @param {number} longitude
-   * @param {string} displayText - The text used to display the location.
-   * @param {string} [countryCode] - ISO country code; picks the default method and madhab on the next launch.
-   */
-  function saveLastLocation(latitude, longitude, displayText, countryCode) {
+
+  // ==============================================
+  //          Manual City Picker
+  // ==============================================
+
+  /** Fills the country list the first time the picker opens, then the chosen country's cities. */
+  async function handleCityPickerToggle(event) {
+    if (event.newState !== "open" || domRefs.countrySelect.options.length) return;
     try {
-      const locationData = {
-        latitude: latitude,
-        longitude: longitude,
-        displayText: displayText,
-        countryCode: countryCode,
-        timestamp: Date.now(), // Store timestamp for potential future expiry logic
-      };
-      localStorage.setItem(
-        STORAGE_KEY_LAST_LOCATION,
-        JSON.stringify(locationData)
-      );
-      console.log("Saved last known location to storage:", locationData);
+      const index = await fetchCityFile("index.json");
+      const options = Object.keys(index)
+        .map((code) => new Option(countryNames.of(code), code))
+        .sort((a, b) => a.text.localeCompare(b.text, "ar"));
+      domRefs.countrySelect.append(...options);
+      domRefs.countrySelect.value =
+        appState.currentLocation?.countryCode ||
+        new Intl.Locale(navigator.language).maximize().region;
+      domRefs.countrySelect.value ||= options[0].value;
+      await loadPickerCities();
     } catch (error) {
-      console.error(
-        "Failed to save last known location to localStorage:",
-        error
-      );
-      // Handle potential errors like QuotaExceededError
-      if (error.name === "QuotaExceededError") {
-        // Maybe show a non-critical toast, but avoid spamming
-        // showToast('Could not save location for next time.', 'warning', 3000);
-      }
+      console.error("City list unavailable:", error);
+      showToast("تعذر تحميل قائمة المدن.", "error");
     }
   }
-  /**
-   * Creates a cache key based on rounded latitude and longitude.
-   * @param {number} latitude
-   * @param {number} longitude
-   * @returns {string} The generated cache key.
-   */
-  function getLocationCacheKey(latitude, longitude) {
-    // Rounding helps cache hits for slightly different coords nearby
-    const latRounded = latitude.toFixed(LOCATION_CACHE_PRECISION);
-    const lonRounded = longitude.toFixed(LOCATION_CACHE_PRECISION);
-    return `${STORAGE_KEY_LOCATION_CACHE_PREFIX}${latRounded}_${lonRounded}`;
+
+  /** Loads the selected country's cities as the city field's suggestions (largest first). */
+  async function loadPickerCities() {
+    const countryCode = domRefs.countrySelect.value;
+    domRefs.cityInput.value = "";
+    domRefs.cityList.replaceChildren();
+    const data = await fetchCityFile(`${countryCode}.json`);
+    if (domRefs.countrySelect.value !== countryCode) return; // Another country was picked meanwhile
+    appState.pickerCities = { countryCode, ...data };
+    domRefs.cityList.replaceChildren(
+      ...data.cities.map(
+        ([nameAr, name]) => new Option(nameAr ? name : "", nameAr || name)
+      )
+    );
   }
 
-  /**
-   * Retrieves and validates cached location data from localStorage.
-   * @param {string} cacheKey - The key to look up.
-   * @returns {object | null} The cached data item { data, timestamp } or null if not found/invalid/expired.
-   */
-  function getCachedLocationData(cacheKey) {
-    try {
-      const cachedString = localStorage.getItem(cacheKey);
-      if (!cachedString) return null;
-
-      const cachedItem = JSON.parse(cachedString);
-
-      // Basic validation
-      if (
-        !cachedItem ||
-        typeof cachedItem !== "object" ||
-        !cachedItem.timestamp ||
-        !cachedItem.data
-      ) {
-        console.warn("Invalid cached location data structure found:", cacheKey);
-        localStorage.removeItem(cacheKey); // Clean up invalid data
-        return null;
-      }
-
-      // Check expiry
-      const isExpired =
-        Date.now() - cachedItem.timestamp > LOCATION_CACHE_EXPIRY_MS;
-      if (isExpired) {
-        console.log("Location cache expired:", cacheKey);
-        localStorage.removeItem(cacheKey); // Remove expired data
-        return null;
-      }
-
-      // Return the valid, non-expired item (including timestamp for potential future use)
-      return cachedItem;
-    } catch (error) {
-      console.error("Error retrieving/parsing cached location data:", error);
-      // Attempt to remove potentially corrupted data
-      try {
-        localStorage.removeItem(cacheKey);
-      } catch (e) {
-        /* ignore cleanup error */
-      }
-      return null;
+  /** Calculates for the city chosen in the picker; being manual, it's kept on later starts. */
+  function handleCityPick(event) {
+    event.preventDefault();
+    const { countryCode, tz, cities = [] } = appState.pickerCities || {};
+    const value = domRefs.cityInput.value.trim();
+    // ponytail: places sharing a name resolve to the most populous one; add regions to the names if that bites
+    const row = cities.find(
+      ([nameAr, name]) => value === (nameAr || name) || value === name
+    );
+    if (!row) {
+      domRefs.cityInput.setCustomValidity("اختر مدينة من القائمة.");
+      domRefs.cityInput.reportValidity();
+      return;
     }
+    domRefs.citySheet.hidePopover();
+    setLocation({ ...cityLocation(row, countryCode, tz), manual: true });
   }
 
   // ==============================================
@@ -962,13 +915,13 @@
    * @returns {string} The method that is actually selected.
    */
   function applyLocationDefaults(countryCode) {
+    const defaults = prayerRules.countryDefaults(countryCode);
     if (domRefs.madhabSelect) {
       domRefs.madhabSelect.value =
-        localStorage.getItem(STORAGE_KEY_MADHAB_CHOICE) ||
-        (HANAFI_COUNTRIES.includes(countryCode) ? "Hanafi" : "Shafi");
+        localStorage.getItem(STORAGE_KEY_MADHAB_CHOICE) || defaults.madhab;
     }
     const countryMethod = countryCode
-      ? COUNTRY_TO_METHOD_MAP[countryCode]
+      ? defaults.method
       : localStorage.getItem(STORAGE_KEY_PRAYER_METHOD);
     return selectMethod(
       localStorage.getItem(STORAGE_KEY_METHOD_CHOICE) ||
@@ -1008,17 +961,19 @@
     }
 
     try {
-      const coordinates = new adhan.Coordinates(latitude, longitude);
-      const today = new Date();
-      const timesForDay = (dayOffset) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() + dayOffset);
-        const params = getAdhanCalculationParameters(methodKey, coordinates, date);
-        return new adhan.PrayerTimes(coordinates, date, params);
-      };
+      const now = new Date();
+      const madhab = domRefs.madhabSelect?.value;
+      const timesForDay = (dayOffset) =>
+        prayerRules.prayerTimes(
+          latitude,
+          longitude,
+          locationDay(now, dayOffset),
+          methodKey,
+          madhab
+        );
 
       appState.currentPrayerTimes = timesForDay(0);
-      appState.timelineDay = today.toDateString();
+      appState.timelineDay = locationDay(now).toDateString();
       // Yesterday's Isha and tomorrow's Fajr bracket today, so every moment has a previous and a next prayer
       appState.prayerTimeline = [
         { key: "isha", time: timesForDay(-1).isha },
@@ -1054,34 +1009,6 @@
     enableLocationButton(true, "خطأ في الحساب"); // Show error on button
     setPrayerTimesSkeletonState(true); // Also stops the countdown and clears the times
     domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // A11y: no longer busy (error state)
-  }
-
-  /**
-   * Gets the Adhan.js parameters for a method key (falling back to the default method) on one day,
-   * with the madhab from its dropdown and the high-latitude rule Adhan recommends for the location.
-   * Our keys are adhan.CalculationMethod names, except ISNA (Adhan's NorthAmerica).
-   * @param {string} methodKey - The method key (e.g., 'Egyptian').
-   * @param {adhan.Coordinates} coordinates - The location.
-   * @param {Date} date - The day being calculated (Umm al-Qura's Isha changes in Ramadan).
-   * @returns {object} The Adhan.js parameters object.
-   */
-  function getAdhanCalculationParameters(methodKey, coordinates, date) {
-    const methods = adhan.CalculationMethod;
-    const name = methodKey === "ISNA" ? "NorthAmerica" : methodKey;
-    const params = (
-      Object.hasOwn(methods, name) ? methods[name] : methods[DEFAULT_PRAYER_METHOD]
-    )();
-    params.madhab =
-      domRefs.madhabSelect?.value === "Hanafi"
-        ? adhan.Madhab.Hanafi
-        : adhan.Madhab.Shafi;
-    // The default rule puts both Fajr and Isha at midnight in high-latitude summers (e.g. London)
-    params.highLatitudeRule = adhan.HighLatitudeRule.recommended(coordinates);
-    // Umm al-Qura's Isha is 2 hours after Maghrib in Ramadan, not 90 minutes (Adhan's docs: add 30)
-    if (name === "UmmAlQura" && Number(hijriMonthFormat.format(date)) === 9) {
-      params.adjustments.isha = 30;
-    }
-    return params;
   }
 
   /**
@@ -1167,7 +1094,7 @@
     const location = appState.currentLocation;
 
     // Page left open past midnight: refresh the dates and calculate the new day
-    if (location && now.toDateString() !== appState.timelineDay) {
+    if (location && locationDay(now).toDateString() !== appState.timelineDay) {
       updateDates();
       calculateAndDisplayPrayerTimes(
         location.latitude,
@@ -1515,6 +1442,7 @@
   /** Updates the displayed Gregorian and Hijri dates and day of the week. */
   function updateDates() {
     const now = new Date();
+    const timeZone = locationTimeZone(); // The date where the location is
 
     // --- Day of Week ---
     // **Accessibility:** Add aria-live="polite" aria-atomic="true" to the HTML #day-of-week element
@@ -1522,6 +1450,7 @@
       try {
         domRefs.dayOfWeek.textContent = new Intl.DateTimeFormat("ar", {
           weekday: "long",
+          timeZone,
         }).format(now);
       } catch (e) {
         console.error("Error formatting day of week:", e);
@@ -1538,6 +1467,7 @@
           year: "numeric",
           month: "long",
           day: "numeric",
+          timeZone,
         }).format(now);
       } catch (e) {
         console.error("Error formatting Gregorian date:", e);
@@ -1556,7 +1486,7 @@
         // Example format: ٢٢ ذو القعدة ١٤٤٤ هـ
         domRefs.hijriDate.textContent = new Intl.DateTimeFormat(
           `ar-SA-u-ca-${HIJRI_CALENDAR}`,
-          { day: "numeric", month: "long", year: "numeric" }
+          { day: "numeric", month: "long", year: "numeric", timeZone }
         ).format(now);
       } catch (e) {
         console.warn(
@@ -1567,7 +1497,7 @@
           // Fallback to generic 'ar' locale with Islamic calendar
           domRefs.hijriDate.textContent = new Intl.DateTimeFormat(
             `ar-u-ca-${HIJRI_CALENDAR}`,
-            { day: "numeric", month: "long", year: "numeric" }
+            { day: "numeric", month: "long", year: "numeric", timeZone }
           ).format(now);
         } catch (e2) {
           console.error(
@@ -1598,7 +1528,9 @@
 
     // Optional extra: it must never break initialization (updateDates runs during init)
     try {
-      const today = Temporal.Now.plainDateISO().withCalendar(HIJRI_CALENDAR);
+      const today = Temporal.Now.plainDateISO(locationTimeZone()).withCalendar(
+        HIJRI_CALENDAR
+      );
       for (const year of [today.year, today.year + 1]) {
         for (const occasion of HIJRI_OCCASIONS) {
           const date = Temporal.PlainDate.from({
@@ -1756,19 +1688,16 @@
     if (!appState.currentLocation || !domRefs.forecastContainer) return;
 
     const { latitude, longitude } = appState.currentLocation;
-    const coordinates = new adhan.Coordinates(latitude, longitude);
     const methodKey = domRefs.methodSelect?.value;
+    const madhab = domRefs.madhabSelect?.value;
     const headerCells = PRAYER_DISPLAY_ORDER.map(
       (key) => `<th scope="col">${PRAYER_NAMES_AR[key]}</th>`
     ).join("");
 
     const rows = [];
     for (let i = 0; i < 14; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      date.setHours(12, 0, 0, 0); // Midday avoids DST issues around midnight
-      const params = getAdhanCalculationParameters(methodKey, coordinates, date);
-      const times = new adhan.PrayerTimes(coordinates, date, params);
+      const date = locationDay(new Date(), i);
+      const times = prayerRules.prayerTimes(latitude, longitude, date, methodKey, madhab);
       // data-label / data-day feed the phone carousel (CSS labels and dot names)
       const cells = PRAYER_DISPLAY_ORDER.map(
         (key) =>
@@ -1829,6 +1758,10 @@
     pipRoot.lang = "ar";
     pipRoot.dir = "rtl";
     pipWindow.document.body.classList.add("pip");
+    // <use href="#icon-..."> only finds symbols in its own document
+    pipWindow.document.body.append(
+      document.getElementById("icon-sprite").cloneNode(true)
+    );
 
     const placeholder = document.createComment("next-prayer-info");
     card.before(placeholder);
@@ -1894,6 +1827,17 @@
     domRefs.forecastSheet?.addEventListener("beforetoggle", (event) => {
       if (event.newState === "open") renderForecast();
     });
+    // The city picker popover is filled on first open
+    domRefs.citySheet?.addEventListener("beforetoggle", handleCityPickerToggle);
+    domRefs.countrySelect?.addEventListener("change", () =>
+      loadPickerCities().catch((error) =>
+        console.error("City list unavailable:", error)
+      )
+    );
+    domRefs.cityInput?.addEventListener("input", () =>
+      domRefs.cityInput.setCustomValidity("")
+    );
+    domRefs.cityForm?.addEventListener("submit", handleCityPick);
     // 7. Set Initial Loading/UI State (Always start skeleton)
     setPrayerTimesSkeletonState(true);
     domRefs.prayerTimesContainer.setAttribute("aria-busy", "true");
@@ -1901,58 +1845,30 @@
     // ---> 8. Attempt to Load Prayer Times from Stored Location <---
     let loadedFromStorage = false; // Flag to track if we loaded times automatically
     try {
-      const storedLocationString = localStorage.getItem(
-        STORAGE_KEY_LAST_LOCATION
+      // Older versions cached reverse-geocode results; free that storage
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(STORAGE_KEY_LOCATION_CACHE_PREFIX))
+        .forEach((key) => localStorage.removeItem(key));
+
+      const storedLocationData = JSON.parse(
+        localStorage.getItem(STORAGE_KEY_LAST_LOCATION)
       );
-      if (storedLocationString) {
-        const storedLocationData = JSON.parse(storedLocationString);
-
-        // Validate the stored data
-        if (
-          storedLocationData &&
-          typeof storedLocationData.latitude === "number" &&
-          typeof storedLocationData.longitude === "number"
-        ) {
-          console.log(
-            "Found last known location in storage:",
-            storedLocationData
-          );
-          // Optional: Check timestamp if you want expiry logic
-          // const locationAge = Date.now() - (storedLocationData.timestamp || 0);
-          // if (locationAge > SOME_EXPIRY_LIMIT_MS) { ... }
-
-          const latitude = storedLocationData.latitude;
-          const longitude = storedLocationData.longitude;
-          const displayText =
+      if (
+        typeof storedLocationData?.latitude === "number" &&
+        typeof storedLocationData?.longitude === "number"
+      ) {
+        // Older saves have no countryCode or timeZone: default method, device time zone
+        const { latitude, longitude } = storedLocationData;
+        setLocation({
+          ...storedLocationData,
+          displayText:
             storedLocationData.displayText ||
-            `موقع سابق: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`; // Fallback text
-          // Fill the dropdowns for the stored location's country (older saves have none)
-          const countryCode = storedLocationData.countryCode;
-          const methodKey = applyLocationDefaults(countryCode);
-
-          // Update app state
-          appState.currentLocation = {
-            latitude,
-            longitude,
-            source: "storage",
-            countryCode,
-          };
-
-          // Update UI immediately
-          if (domRefs.locationSpan) {
-            domRefs.locationSpan.textContent = displayText;
-          }
-
-          // Calculate and display times (synchronous and instant, no loading toast needed)
-          calculateAndDisplayPrayerTimes(latitude, longitude, methodKey);
-
-          loadedFromStorage = true; // Mark as loaded
-        } else {
-          console.log("Stored location data was invalid. Clearing.");
-          localStorage.removeItem(STORAGE_KEY_LAST_LOCATION);
-        }
-      } else {
-        console.log("No last known location found in storage.");
+            `موقع سابق: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+        });
+        loadedFromStorage = true;
+      } else if (storedLocationData) {
+        console.log("Stored location data was invalid. Clearing.");
+        localStorage.removeItem(STORAGE_KEY_LAST_LOCATION);
       }
     } catch (error) {
       console.error("Error reading or parsing stored location data:", error);
@@ -1961,6 +1877,7 @@
         localStorage.removeItem(STORAGE_KEY_LAST_LOCATION);
       } catch (e) {}
     }
+    refreshCityInBackground(); // Travellers: follow the user to a new city if allowed before
 
     // 9. Final Log Message
     if (loadedFromStorage) {

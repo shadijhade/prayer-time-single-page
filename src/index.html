@@ -33,20 +33,10 @@
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="prayer times" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
-        as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript>
-        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
-            rel="stylesheet">
-    </noscript>
-
-    <!-- Material Symbols subset: only the icons used here (icon_names must stay alphabetical).
-         offline.html uses the exact same URL so it is served from the service worker cache. -->
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,-25&icon_names=calendar_month,check_circle,close,dark_mode,error,info,location_on,moon_stars,my_location,nights_stay,partly_cloudy_day,picture_in_picture_alt,progress_activity,sunny,warning,water_lux,wb_twilight,wifi_off&display=block" />
+    <!-- Self-hosted Tajawal (@font-face in style.css); the most visible faces start downloading right away -->
+    <link rel="preload" href="fonts/tajawal-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/tajawal-700-arabic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/tajawal-700-latin.woff2" as="font" type="font/woff2" crossorigin>
 
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
@@ -79,6 +69,26 @@
 </head>
 
 <body>
+    <!-- Icons: Material Symbols Rounded (filled, grade -25), Apache License 2.0. Used as <svg class="icon"><use href="#icon-name"/></svg> -->
+    <svg id="icon-sprite" width="0" height="0" style="position: absolute" aria-hidden="true">
+        <symbol id="icon-calendar_month" viewBox="0 -960 960 960"><path d="M204-90q-30.94 0-52.97-22.03Q129-134.06 129-165v-552q0-30.94 22.03-52.97Q173.06-792 204-792h45v-42.5q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v42.5h312v-42.5q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v42.5h45q30.94 0 52.97 22.03Q831-747.94 831-717v552q0 30.94-22.03 52.97Q786.94-90 756-90H204Zm0-75h552v-393H204v393Zm276.05-236q-16.55 0-27.8-11.2Q441-423.39 441-439.95q0-16.55 11.2-27.8Q463.39-479 479.95-479q16.55 0 27.8 11.2Q519-456.61 519-440.05q0 16.55-11.2 27.8Q496.61-401 480.05-401Zm-187.8-11.2Q281-423.39 281-439.95q0-16.55 11.2-27.8Q303.39-479 319.95-479q16.55 0 27.8 11.2Q359-456.61 359-440.05q0 16.55-11.2 27.8Q336.61-401 320.05-401q-16.55 0-27.8-11.2Zm347.8 11.2q-16.55 0-27.8-11.2Q601-423.39 601-439.95q0-16.55 11.2-27.8Q623.39-479 639.95-479q16.55 0 27.8 11.2Q679-456.61 679-440.05q0 16.55-11.2 27.8Q656.61-401 640.05-401Zm-160 160q-16.55 0-27.8-11.2Q441-263.39 441-279.95q0-16.55 11.2-27.8Q463.39-319 479.95-319q16.55 0 27.8 11.2Q519-296.61 519-280.05q0 16.55-11.2 27.8Q496.61-241 480.05-241Zm-187.8-11.2Q281-263.39 281-279.95q0-16.55 11.2-27.8Q303.39-319 319.95-319q16.55 0 27.8 11.2Q359-296.61 359-280.05q0 16.55-11.2 27.8Q336.61-241 320.05-241q-16.55 0-27.8-11.2Zm347.8 11.2q-16.55 0-27.8-11.2Q601-263.39 601-279.95q0-16.55 11.2-27.8Q623.39-319 639.95-319q16.55 0 27.8 11.2Q679-296.61 679-280.05q0 16.55-11.2 27.8Q656.61-241 640.05-241Z"/></symbol>
+        <symbol id="icon-check_circle" viewBox="0 -960 960 960"><path d="m425-407-85.56-85.56Q328.5-503.5 313-503.5q-15.5 0-26.5 11t-11 26.5q0 15.5 10.82 26.32L398.5-327.5q11.32 11.5 26.41 11.5t26.59-11.5l222-222q11-11 11-26.5t-11-26.5q-11-11-26.5-11t-26.37 10.87L425-407Zm55 317q-80.91 0-152.07-30.76-71.15-30.77-123.79-83.5Q151.5-257 120.75-328.09 90-399.17 90-480q0-80.91 30.76-152.07 30.77-71.15 83.5-123.79Q257-808.5 328.09-839.25 399.17-870 480-870q80.91 0 152.07 30.76 71.15 30.77 123.79 83.5Q808.5-703 839.25-631.91 870-560.83 870-480q0 80.91-30.76 152.07-30.77 71.15-83.5 123.79Q703-151.5 631.91-120.75 560.83-90 480-90Z"/></symbol>
+        <symbol id="icon-close" viewBox="0 -960 960 960"><path d="M480-427 285.5-232.5q-11 11-26.5 10.75T232.5-233q-10.5-11-10.25-26.25T233-285l194-195-194-195q-10.5-10.5-10.5-25.75T233-727q10.5-11 26-11.25t26.5 10.75L480-533l194.5-194.5q11-11 26.5-10.75T727.5-727q10.5 11 10.25 26.25T727-675L533-480l194 195q10.5 10.5 10.5 25.75T727-233q-10.5 11-26 11.25t-26.5-10.75L480-427Z"/></symbol>
+        <symbol id="icon-dark_mode" viewBox="0 -960 960 960"><path d="M480-122.5q-149.5 0-253.5-104T122.5-480q0-134.5 89-236.5t224-119q15-2 25.25 2.5t15.75 14q5.5 9 4.5 22.25T471-769q-14.5 24.5-22 51.75T441.5-660q0 91 63.75 154.75T660-441.5q29.5 0 57.5-7.75T769-471q14.5-8.5 27.5-9.5t22 4q10 5 14.5 15.25t2.5 25.75q-15.5 133-118 223t-237.5 90Z"/></symbol>
+        <symbol id="icon-error" viewBox="0 -960 960 960"><path d="M507-295.89q11-10.9 11-27Q518-339 507.11-350q-10.9-11-27-11Q464-361 453-350.11q-11 10.9-11 27Q442-307 452.89-296q10.9 11 27 11Q496-285 507-295.89ZM507-451q11-11 11-26.5v-161q0-15.5-11-26.5t-26.5-11q-15.5 0-26.5 11t-11 26.5v161q0 15.5 11 26.5t26.5 11q15.5 0 26.5-11ZM480-90q-80.91 0-152.07-30.76-71.15-30.77-123.79-83.5Q151.5-257 120.75-328.09 90-399.17 90-480q0-80.91 30.76-152.07 30.77-71.15 83.5-123.79Q257-808.5 328.09-839.25 399.17-870 480-870q80.91 0 152.07 30.76 71.15 30.77 123.79 83.5Q808.5-703 839.25-631.91 870-560.83 870-480q0 80.91-30.76 152.07-30.77 71.15-83.5 123.79Q703-151.5 631.91-120.75 560.83-90 480-90Z"/></symbol>
+        <symbol id="icon-info" viewBox="0 -960 960 960"><path d="M507-296q11-11 11-26.5v-159q0-15.5-11-26.5t-26.5-11q-15.5 0-26.5 11t-11 26.5v159q0 15.5 11 26.5t26.5 11q15.5 0 26.5-11Zm0-310.89q11-10.9 11-27Q518-650 507.11-661q-10.9-11-27-11Q464-672 453-661.11q-11 10.9-11 27Q442-618 452.89-607q10.9 11 27 11Q496-596 507-606.89ZM480-90q-80.91 0-152.07-30.76-71.15-30.77-123.79-83.5Q151.5-257 120.75-328.09 90-399.17 90-480q0-80.91 30.76-152.07 30.77-71.15 83.5-123.79Q257-808.5 328.09-839.25 399.17-870 480-870q80.91 0 152.07 30.76 71.15 30.77 123.79 83.5Q808.5-703 839.25-631.91 870-560.83 870-480q0 80.91-30.76 152.07-30.77 71.15-83.5 123.79Q703-151.5 631.91-120.75 560.83-90 480-90Z"/></symbol>
+        <symbol id="icon-location_on" viewBox="0 -960 960 960"><path d="M453.5-120.75q-13-4.75-23.5-14.25-52-47.5-99-99.25t-82.75-105q-35.75-53.25-57-106.75T170-550.5q0-146 93.75-232.5T480-869.5q122.5 0 216.25 86.5T790-550.5q0 51-21.25 104.5t-57 106.75Q676-286 629-234.25T530-135q-10.5 9.5-23.5 14.25T480-116q-13.5 0-26.5-4.75Zm81.25-384.5Q557.5-528 557.5-560t-22.75-54.75Q512-637.5 480-637.5t-54.75 22.75Q402.5-592 402.5-560t22.75 54.75Q448-482.5 480-482.5t54.75-22.75Z"/></symbol>
+        <symbol id="icon-moon_stars" viewBox="0 -960 960 960"><path d="M483-82.5q-83 0-156.25-31.75t-127.5-86q-54.25-54.25-86-127.5T81.5-484q0-123 68.25-223.75T333-855q13.5-5 27.5-4t23 8.5q8 6.5 12 18.5t4 30.5q1.5 80.5 32 153.25t87 129.25Q575-462.5 648-432.5T801-401q19 0 30.25 3.75T849-385.5q7.5 9 9.25 23.25T855-335q-46 115-147.5 183.75T483-82.5ZM573.5-670 510-733.5Q498.5-745 498.5-760t11.5-26.5l63.5-63.5q11.5-11.5 26.5-11.5t26.5 11.5l63.5 63.5q11.5 11.5 11.5 26.5T690-733.5L626.5-670Q615-658.5 600-658.5T573.5-670Zm200 120L750-573.5Q738.5-585 738.5-600t11.5-26.5l23.5-23.5q11.5-11.5 26.5-11.5t26.5 11.5l23.5 23.5q11.5 11.5 11.5 26.5T850-573.5L826.5-550Q815-538.5 800-538.5T773.5-550Z"/></symbol>
+        <symbol id="icon-my_location" viewBox="0 -960 960 960"><path d="M443-91.5V-131q-123.5-13-211.25-100.75T131-443H91.5Q76-443 65-454t-11-26.5Q54-496 65-507t26.5-11H131q13-123.5 100.75-210.75T443-829v-39.5q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v39.5q123.5 13 210.75 100.25T829-518h39.5q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5t-26.5 11H829q-13 123.5-100.25 211.25T518-131v39.5Q518-76 507-65t-26.5 11Q465-54 454-65t-11-26.5Zm232.75-193.75Q756-366.5 756-481t-80.25-194.75Q595.5-756 481-756t-195.75 80.25Q204-595.5 204-481t81.25 195.75Q366.5-204 481-204t194.75-81.25ZM371-371q-45-45-45-109t45-109q45-45 109-45t109 45q45 45 45 109t-45 109q-45 45-109 45t-109-45Z"/></symbol>
+        <symbol id="icon-nights_stay" viewBox="0 -960 960 960"><path d="M240-440q48 0 88 26t59 71l10 23h25q41.5 0 69.75 29.5T520-220q0 42-29 71t-71 29H240q-66 0-113-47T80-280q0-67 47-113.5T240-440Zm319.5-79q61 61 139.25 91T863-403.5q10-1 18.25 2.75T895-389.5q5.5 7.5 7.25 16t-1.25 18q-37 121-141.5 196.5t-231 76.5h-1q32-25 49.75-61T595-220q0-65.5-42.5-113.75T446-392.5q-31.5-56-86.5-89.25T240-515q-31 0-61 8t-56.5 23.5v-2.5q1-131.5 75.5-231.25T394.5-859.5q9.5-3 18.25-1.25T429-853.5q7.5 5.5 11.5 13.5t3.5 18q-4 87.5 24.5 164t91 139Z"/></symbol>
+        <symbol id="icon-partly_cloudy_day" viewBox="0 -960 960 960"><path d="m736-171-56-57q-10.5-11-10.5-26.25T680-280q10.5-10.5 25.75-10.5T732-280l57 56q11.5 11 11.5 26.25T789-171q-11.5 11.5-26.75 11.5T736-171Zm-496 11q-66 0-113-47T80-320q0-66 47-113t113-47q48 0 88.5 26t58.5 71l10 22.5h23.5q42 0 70.5 29.25T519.5-260q0 42-29 71t-71 29H240Zm353.5-112.5q-4.5-63-45.25-109.25T446-433.5q-26.5-56.5-80-87.75T249-555q25-74 88.75-118.25T480-717.5q99 0 168.25 69.25T717.5-480q0 65.5-33.25 120.75T593.5-272.5Zm206.5-170q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h80q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5t-26.5 11h-80ZM228-680l-57-57q-10.5-10.5-10.5-26t10.5-26q11.5-11.5 26.75-11.5T224-789l56 57q10.5 11 10.5 26.25T280-680q-10.5 10.5-26 10.5T228-680Zm452 0q-10.5-10.5-10.5-25.75T680-732l56-57q11-11.5 26.25-11.5T789-789q10.5 10.5 10.5 26T789-737l-57 57q-10.5 10.5-26 10.5T680-680Zm-226.5-93.5q-11-11-11-26.5v-80q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v80q0 15.5-11 26.5t-26.5 11q-15.5 0-26.5-11Z"/></symbol>
+        <symbol id="icon-picture_in_picture_alt" viewBox="0 -960 960 960"><path d="M165-169q-31 0-53-22t-22-53v-472q0-31 22-53t53-22h630q31 0 53 22t22 53v472q0 31-22 53t-53 22H165Zm314.5-114h239q15.5 0 26.5-11t11-26.5v-160q0-15.5-11-26.5t-26.5-11h-239q-15.5 0-26.5 11t-11 26.5v160q0 15.5 11 26.5t26.5 11ZM599-400.5Z"/></symbol>
+        <symbol id="icon-progress_activity" viewBox="0 -960 960 960"><path d="M328.45-120.66q-71.05-30.66-124.09-83.7-53.04-53.04-83.7-124.09Q90-399.5 90-480.14q0-80.63 30.75-151.5 30.75-70.86 83.75-123.93 53.01-53.08 124-83.75Q399.5-870 480-870q15.94 0 26.72 10.79 10.78 10.8 10.78 26.75 0 15.96-10.78 26.71T480-795q-131.5 0-223.25 91.75T165-480q0 131.5 91.75 223.25T480-165q131.5 0 223.25-91.75T795-480q0-15.94 10.79-26.72 10.8-10.78 26.75-10.78 15.96 0 26.71 10.78T870-480q0 80.5-30.71 151.55-30.7 71.05-83.82 124.09-53.13 53.04-123.8 83.7Q561-90 480.25-90q-80.75 0-151.8-30.66Z"/></symbol>
+        <symbol id="icon-sunny" viewBox="0 -960 960 960"><path d="M453.5-773.5q-11-11-11-26.5v-80q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v80q0 15.5-11 26.5t-26.5 11q-15.5 0-26.5-11ZM680-680q-11-10.5-10.75-25.75T680-732l56-57q11.5-11.5 26.5-11.5T789-789q11 10.5 10.75 26T789-737l-57 57q-10.5 10.5-26 10.5T680-680Zm120 237.5q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h80q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5t-26.5 11h-80Zm-346.5 389q-11-11-11-26.5v-80q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11t11 26.5v80q0 15.5-11 26.5t-26.5 11q-15.5 0-26.5-11ZM228-680l-57-56q-11.5-11-11.5-26.5T171-789q11-10.5 26.25-10.5T223-789l57 57q10.5 10.5 10.75 26t-10.25 26q-11.5 11-26.25 11T228-680Zm508 509.5-56-57q-10.5-11.5-10.5-26.75T680-280q10.5-10.5 25.75-10.5T732-280l57.5 56q11.5 10.5 11 26T789-171q-11 11.5-26.75 11.75T736-170.5Zm-656-272q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h80q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5t-26.5 11H80Zm91 272q-11-11-11-26.25T171-223l57-57q10.5-10.5 25.75-10.5T280-280q11.5 11.5 11.5 26.5T280-227l-56 56q-11.5 11.5-27 11.5t-26-11Zm140.75-141.25Q242.5-381 242.5-480t69.25-168.25Q381-717.5 480-717.5t168.25 69.25Q717.5-579 717.5-480t-69.25 168.25Q579-242.5 480-242.5t-168.25-69.25Z"/></symbol>
+        <symbol id="icon-warning" viewBox="0 -960 960 960"><path d="M118-129q-10.5 0-19-5.25T85.5-148q-5-8.5-5.25-18.25t5.25-19.25l362-624.5q5.5-9.5 14.25-14t18.25-4.5q9.5 0 18.25 4.5t14.25 14l362 624.5q5.5 9.5 5.25 19.25T874.5-148q-5 8.5-13.5 13.75T842-129H118Zm389-127q11-11 11-27t-11-27q-11-11-27-11t-27 11q-11 11-11 27t11 27q11 11 27 11t27-11Zm0-115q11-11 11-26.5v-122q0-15.5-11-26.5t-26.5-11q-15.5 0-26.5 11t-11 26.5v122q0 15.5 11 26.5t26.5 11q15.5 0 26.5-11Z"/></symbol>
+        <symbol id="icon-water_lux" viewBox="0 -960 960 960"><path d="M350-123q-56 0-76-19.5T218-162q-14 0-27 5t-47 24.5q-18.5 10.5-36.75-.5T89-165.5q0-10.5 5.25-19T108.5-198q47-26 64.75-32.5T218-237q55.5 0 75.25 19.5T349-198q37 0 56.25-19.5T480.5-237q55 0 75 19.5T611-198q37 0 56.5-19.5T743-237q27 0 45.25 6.5T853-198q9 5 14 13.75t5 18.75q0 21.5-18.5 32.5t-37 .5q-34-19.5-46.75-24.5T743-162q-36 0-55.5 19.5T612-123q-55 0-75.25-19.5T480.5-162q-37 0-55.75 19.5T350-123Zm0-160q-56 0-76-19.5T218-322q-14 0-26.5 4.75T145-293q-18.5 10.5-37-.5T89.5-326q0-10.5 5.25-19T109-358.5q47-26 64.5-32.25T218-397q55.5 0 75.25 19.5T349-358q37 0 56.25-19.5T480.5-397q55 0 75 19.5T611-358q37 0 56.5-19.5T743-397q27 0 44.75 6.25T852-358.5q9 5 14 13.75t5 18.75q0 21.5-18.5 32.5t-37 .5q-34-19.5-46.25-24.25T743-322q-36 0-55.5 19.5T612-283q-55 0-75.25-19.5T480.5-322q-37 0-55.75 19.5T350-283Zm9.25-401.25Q306.5-726 290.5-792q-4.5-18 8-31.75T330-837.5h300q18.5 0 30.75 13.75T669.5-792q-16 66-68.75 107.75T480-642.5q-68 0-120.75-41.75ZM226.5-773.5q-11 11-26.5 11h-40q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h40q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5Zm73 122.5q11.5 11.5 11.5 26.75t-11.5 26.75L271-569q-11 11-26 10.75T218.5-569Q207-580.5 207-595.75t11.5-26.75L247-651q11-11 26-10.75T299.5-651Zm207 64.5q11 11 11 26.5v40q0 15.5-11 26.5t-26.5 11q-15.5 0-26.5-11t-11-26.5v-40q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11ZM661-651q10.5-10.5 25.75-10.5T713-651l28.5 28q11.5 11.5 11.75 26.5T742-570q-11.5 11.5-26.75 11.5T688.5-570l-28-28.5Q650-610 649.75-624.75T661-651Zm165.5-122.5q-11 11-26.5 11h-40q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h40q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5Z"/></symbol>
+        <symbol id="icon-wb_twilight" viewBox="0 -960 960 960"><path d="M790-668q11 11 11 26t-11 26l-29 29.5q-11.5 11.5-26.75 11.25T707.5-587q-11-11.5-10.75-26.5T708.5-640l29.5-29q11.5-10.5 26.25-10.25T790-668ZM120-162.5q-15.5 0-26.5-11t-11-26.5q0-15.5 11-26.5t26.5-11h720q15.5 0 26.5 11t11 26.5q0 15.5-11 26.5t-26.5 11H120Zm386.5-624q11 11 11 26.5v40q0 15.5-11 26.5t-26.5 11q-15.5 0-26.5-11t-11-26.5v-40q0-15.5 11-26.5t26.5-11q15.5 0 26.5 11ZM172-670q11-11 26-11t26 11l29.5 29q11.5 11.5 11.25 26.75T253-587.5Q241.5-577 226.25-577T200-588.5L171-618q-10.5-11.5-10.25-26.25T172-670Zm30.5 347.5q1-115.5 81.5-195.25t196-79.75q115.5 0 196 79.75t81.5 195.25h-555Z"/></symbol>
+    </svg>
     <header role="banner">
         <div class="themeToggle-container">
             <input id="themeToggle" class="toggle" type="checkbox" aria-label="تبديل الوضع الداكن/الفاتح">
@@ -92,19 +102,25 @@
         </section>
         <!-- Days until Ramadan / Eid (Temporal, Umm al-Qura calendar); stays hidden without Temporal -->
         <p class="occasion-countdown" id="occasion-countdown" hidden>
-            <span class="material-symbols-rounded" aria-hidden="true">dark_mode</span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-dark_mode"/></svg>
             <span id="occasion-text"></span>
         </p>
         <div class="location-container">
-            <span class="material-symbols-rounded location-icon" aria-hidden="true">location_on</span>
+            <svg class="icon location-icon" aria-hidden="true"><use href="#icon-location_on"/></svg>
             <span id="location-status">الموقع: <span id="location" aria-live="polite" aria-atomic="true">جاري
                     التحديد...</span></span>
         </div>
-        <button id="use-location-btn" type="button" class="location-button"
-            aria-label="استخدام موقعي الحالي لحساب المواقيت">
-            <span class="material-symbols-rounded" aria-hidden="true">my_location</span>
-            <span class="btn-text">استخدام موقعي الحالي</span>
-        </button>
+        <div class="location-actions">
+            <button id="use-location-btn" type="button" class="location-button"
+                aria-label="استخدام موقعي الحالي لحساب المواقيت">
+                <svg class="icon" aria-hidden="true"><use href="#icon-my_location"/></svg>
+                <span class="btn-text">استخدام موقعي الحالي</span>
+            </button>
+            <button type="button" class="location-button" popovertarget="city-sheet">
+                <svg class="icon" aria-hidden="true"><use href="#icon-location_on"/></svg>
+                <span class="btn-text">اختيار المدينة</span>
+            </button>
+        </div>
     </header>
 
     <main role="main">
@@ -114,7 +130,7 @@
             <!-- Shown only where Document Picture-in-Picture is supported -->
             <button id="pip-btn" type="button" class="icon-button pip-button" hidden
                 aria-label="عرض العد التنازلي في نافذة عائمة" title="نافذة عائمة">
-                <span class="material-symbols-rounded" aria-hidden="true">picture_in_picture_alt</span>
+                <svg class="icon" aria-hidden="true"><use href="#icon-picture_in_picture_alt"/></svg>
             </button>
             <h2 id="next-prayer-heading">الصلاة القادمة: <span id="next-prayer-name" aria-live="polite"
                     aria-atomic="true" class="skeleton-text">--</span></h2>
@@ -139,43 +155,37 @@
             <div class="prayer-times-container" id="prayer-times-container" aria-busy="true">
                 <!-- Fajr Card -->
                 <div class="prayer-card" data-prayer="fajr" role="region" aria-label="وقت صلاة الفجر">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">nights_stay</span>الفجر</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-nights_stay"/></svg>الفجر</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
 
                 <!-- Sunrise Card -->
                 <div class="prayer-card" data-prayer="sunrise" role="region" aria-label="وقت شروق الشمس">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">wb_twilight</span>الشروق</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-wb_twilight"/></svg>الشروق</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
 
                 <!-- Dhuhr Card -->
                 <div class="prayer-card" data-prayer="dhuhr" role="region" aria-label="وقت صلاة الظهر">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">sunny</span>الظهر</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-sunny"/></svg>الظهر</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
 
                 <!-- Asr Card -->
                 <div class="prayer-card" data-prayer="asr" role="region" aria-label="وقت صلاة العصر">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">partly_cloudy_day</span>العصر</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-partly_cloudy_day"/></svg>العصر</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
 
                 <!-- Maghrib Card -->
                 <div class="prayer-card" data-prayer="maghrib" role="region" aria-label="وقت صلاة المغرب">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">water_lux</span>المغرب</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-water_lux"/></svg>المغرب</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
 
                 <!-- Isha Card -->
                 <div class="prayer-card" data-prayer="isha" role="region" aria-label="وقت صلاة العشاء">
-                    <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
-                            aria-hidden="true">moon_stars</span>العشاء</div>
+                    <div class="prayer-name"><svg class="icon prayer-icon" aria-hidden="true"><use href="#icon-moon_stars"/></svg>العشاء</div>
                     <div class="prayer-time skeleton">--:--</div>
                 </div>
             </div>
@@ -185,7 +195,7 @@
         <section class="forecast-controls" aria-label="المواقيت المستقبلية">
             <button id="show-forecast-btn" type="button" class="forecast-button" popovertarget="forecast-sheet"
                 disabled>
-                <span class="material-symbols-rounded icon" aria-hidden="true">calendar_month</span>
+                <svg class="icon" aria-hidden="true"><use href="#icon-calendar_month"/></svg>
                 <span class="btn-text">عرض مواقيت 14 يومًا قادمة</span>
             </button>
         </section>
@@ -206,6 +216,10 @@
                 <option value="Qatar">قطر</option>
                 <option value="Singapore">سنغافورة</option>
                 <option value="Turkey">رئاسة الشؤون الدينية، تركيا</option>
+                <option value="JAKIM">جاكيم، ماليزيا</option>
+                <option value="Kemenag">وزارة الشؤون الدينية، إندونيسيا</option>
+                <option value="Jordan">وزارة الأوقاف، الأردن</option>
+                <option value="Morocco">وزارة الأوقاف، المغرب</option>
             </select>
         </section>
 
@@ -220,14 +234,35 @@
 
     <footer role="contentinfo">
         <p>جميع الحقوق محفوظة © <time id="current-year" datetime=""></time> - شادي جهاد</p>
+        <p>بيانات المدن: <a href="https://www.geonames.org/" rel="noopener">GeoNames</a> (CC BY 4.0)</p>
     </footer>
+
+    <!-- City picker: country, then a city from the GeoNames files in cities/ (filled by app.js) -->
+    <div id="city-sheet" class="forecast-sheet city-sheet" popover role="dialog" aria-labelledby="city-heading">
+        <div class="sheet-header">
+            <h2 id="city-heading">اختيار المدينة</h2>
+            <button type="button" class="icon-button" popovertarget="city-sheet" popovertargetaction="hide"
+                aria-label="إغلاق">
+                <svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>
+            </button>
+        </div>
+        <form id="city-form" class="city-form">
+            <label for="country-select" class="method-label">الدولة</label>
+            <select id="country-select" class="method-select" required></select>
+            <label for="city-input" class="method-label">المدينة</label>
+            <input id="city-input" class="method-select" list="city-list" required autocomplete="off"
+                placeholder="اكتب اسم المدينة واختر من القائمة">
+            <datalist id="city-list"></datalist>
+            <button type="submit" class="location-button">عرض مواقيت المدينة</button>
+        </form>
+    </div>
 
     <div id="forecast-sheet" class="forecast-sheet" popover role="dialog" aria-labelledby="forecast-heading">
         <div class="sheet-header">
             <h2 id="forecast-heading">مواقيت الأيام القادمة</h2>
             <button type="button" class="icon-button" popovertarget="forecast-sheet" popovertargetaction="hide"
                 aria-label="إغلاق">
-                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                <svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>
             </button>
         </div>
         <div id="forecast-table-container" class="forecast-table-container"></div>
@@ -238,6 +273,7 @@
         <button id="update-button" type="button">تحديث الآن</button>
     </div>
     <script src="adhan.umd.js" defer></script>
+    <script src="prayer-rules.js" defer></script>
     <script src="app.js" defer></script>
 </body>
 
