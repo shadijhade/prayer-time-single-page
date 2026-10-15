@@ -1,7 +1,7 @@
 // sw.js: the app shell is served cache-first, so the app opens instantly and works offline
 // (prayer times are calculated on the device). City files are stale-while-revalidate.
 // Bump APP_SHELL_CACHE_NAME whenever a file in APP_SHELL_ASSETS changes, or returning users keep the old one.
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.5.0";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.6.0";
 const CITIES_CACHE_NAME = "prayer-times-cities-v1";
 
 const APP_SHELL_ASSETS = [

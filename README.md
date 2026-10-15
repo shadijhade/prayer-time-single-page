@@ -5,7 +5,7 @@ A lightweight, accurate, and offline-capable Progressive Web Application (PWA) f
 ## 🚀 Features
 
 - **City-centre prayer times**: Your position is matched to your city's centre, like the timetables mosques publish, or you pick the city by hand. Times are calculated with `adhan.js`; a city picked by hand shows its own clock.
-- **Checked against official timetables**: `node scripts/check-times.js` compares the app with the times 11 authorities publish for 13 cities: Umm al-Qura, Diyanet, JAKIM, MUIS, Kemenag, Egypt's Survey Authority, the Jordanian and Moroccan ministries, Qatar, Banuri Town (Karachi) and the Moonsighting Committee (London, New York). Every checked day is within a minute, or two for one day of Makkah.
+- **Checked against official timetables**: `node scripts/check-times.js` compares the app with the times 20 authorities publish for 23 cities: Umm al-Qura, Diyanet, JAKIM, MUIS, Kemenag, Egypt's Survey Authority, the Jordanian, Moroccan, Omani, Bahraini and Algerian ministries, Qatar, Banuri Town (Karachi), the Moonsighting Committee (London, New York), the UAE's Awqaf (Abu Dhabi, Dubai), Iraq's Sunni Endowment, Sudan's Fiqh Academy, Libya's Dar al-Ifta, Tunisia's meteorology institute and the Islamic Foundation Bangladesh. Every checked day is within a minute, or two for one day of Makkah and for Tunis's winter Asr. Kuwait and India aren't checked: neither publishes a timetable online that the check can use.
 - **Private and free to run**: No third-party requests at all. City data, fonts and icons are served with the app, and your location never leaves the device.
 - **Offline Support**: The app opens from the Service Worker cache, so it starts instantly and works offline.
 - **PWA support**: Installable on mobile and desktop devices.

@@ -25,19 +25,21 @@
     MY: "JAKIM",
     ID: "Kemenag",
     TR: "Turkey",
-    BD: "Karachi",
+    BD: "Bangladesh",
     IN: "Karachi",
     AF: "Karachi",
     SY: "Egyptian",
     LB: "Egyptian",
-    TN: "Karachi",
-    DZ: "MuslimWorldLeague",
+    TN: "Tunisia",
+    DZ: "Algeria",
+    LY: "Libya",
     MA: "Morocco",
     JO: "Jordan",
-    IQ: "MuslimWorldLeague",
+    IQ: "Iraq",
+    SD: "Sudan",
     YE: "UmmAlQura",
-    OM: "UmmAlQura",
-    BH: "UmmAlQura",
+    OM: "Oman",
+    BH: "Bahrain",
     RU: "MuslimWorldLeague",
     KZ: "MuslimWorldLeague",
     UZ: "MuslimWorldLeague",
@@ -57,7 +59,8 @@
   // Authorities' own timetables, measured by scripts/check-times.js: the twilight angles, and the
   // minutes each authority adds to the plain astronomical times (then rounded to the nearest
   // minute). Methods Adhan.js lacks, plus corrections to some of its own.
-  // ponytail: fitted on one week of October 2026 per authority; refresh the check's data in another season
+  // ponytail: most are fitted on one week of October 2026 (plus June and December where the
+  // authority publishes them); add other seasons to the check where they're still missing
   const OFFICIAL_METHODS = {
     // JAKIM, Malaysia: Subuh at 18 degrees, not Singapore's 20
     JAKIM: {
@@ -98,6 +101,47 @@
     Qatar: { base: "Qatar", minutes: { fajr: -1, maghrib: 2, isha: 2 } },
     // Egyptian General Authority of Survey adds nothing (Adhan adds a minute to Dhuhr)
     Egyptian: { base: "Egyptian", minutes: {} },
+    // UAE General Authority of Islamic Affairs (Awqaf): Asr is 1 minute after the shadow time, not 3
+    Dubai: { base: "Dubai", minutes: { sunrise: -3, dhuhr: 3, asr: 1, maghrib: 3 } },
+    // Ministry of Endowments and Religious Affairs, Oman (rounds up, so some days are a minute early)
+    Oman: {
+      base: "MuslimWorldLeague",
+      fajrAngle: 18,
+      ishaAngle: 18,
+      minutes: { fajr: 1, sunrise: 1, dhuhr: 6, asr: 6, maghrib: 6, isha: 1 },
+    },
+    // Ministry of Justice, Islamic Affairs and Waqf, Bahrain: Isha by angle, also in Ramadan
+    Bahrain: {
+      base: "MuslimWorldLeague",
+      fajrAngle: 18,
+      ishaAngle: 18,
+      minutes: { fajr: -1, sunrise: -1, dhuhr: 1, maghrib: 1, isha: -1 },
+    },
+    // Sunni Endowment Office, Iraq
+    Iraq: { base: "MuslimWorldLeague", minutes: { sunrise: -1, dhuhr: 5, asr: 3, maghrib: 3 } },
+    // Islamic Fiqh Academy, Sudan
+    Sudan: {
+      base: "MuslimWorldLeague",
+      fajrAngle: 18,
+      ishaAngle: 18,
+      minutes: { fajr: -1, dhuhr: 3 },
+    },
+    // Ministry of Religious Affairs and Wakfs, Algeria
+    Algeria: {
+      base: "MuslimWorldLeague",
+      minutes: { fajr: 1, sunrise: 1, dhuhr: 1, asr: 1, maghrib: 4, isha: 1 },
+    },
+    // Dar al-Ifta, Libya (October only: no other season published)
+    Libya: {
+      base: "MuslimWorldLeague",
+      fajrAngle: 19,
+      ishaAngle: 18,
+      minutes: { fajr: 2, sunrise: -1, dhuhr: 3, maghrib: 3, isha: 1 },
+    },
+    // Tunisia's meteorology institute, whose times the Ministry of Religious Affairs shows
+    Tunisia: { base: "Karachi", minutes: { dhuhr: 7, asr: 1, maghrib: 2 } },
+    // Islamic Foundation Bangladesh (with Hanafi Asr, the country default)
+    Bangladesh: { base: "Karachi", minutes: { fajr: 1, dhuhr: 3, asr: 7, maghrib: 3, isha: 2 } },
   };
 
   // Umm al-Qura month number of a date ("9" in Ramadan)
