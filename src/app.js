@@ -38,7 +38,8 @@
 
   // --- Installed App ---
   // iPhone screens in device pixels, portrait (iPhone 6s to 17 and Air), with launch screens in
-  // splash/<size>-light.jpg and -dark.jpg; iPads and new sizes get none until added here
+  // splash/<size>-light.jpg and -dark.jpg; iPads and new sizes get none until added here (then run
+  // scripts/make-install-assets.mjs to draw them)
   const IOS_LAUNCH_SCREEN_SIZES = [
     "750x1334", "828x1792", "1125x2436", "1170x2532", "1179x2556", "1206x2622",
     "1242x2208", "1242x2688", "1260x2736", "1284x2778", "1290x2796", "1320x2868",

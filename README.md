@@ -34,12 +34,18 @@ This project leverages modern web technologies to ensure speed, reliability, and
 - **Service Worker (`sw.js`)**:
   - **App Shell, cache-first**: The page, scripts, styles and fonts are cached on install, so launches never wait on the network. Bump `APP_SHELL_CACHE_NAME` whenever one of them changes.
   - **Stale-While-Revalidate**: City files are cached on first use and refreshed in the background.
-- **Web App Manifest**: Ensures the app feels native with proper icons, theme colors, and display modes. The install dialog's screenshots (`src/screenshots/`) and the iPhone launch screens (`src/splash/`, one per screen size, listed in `IOS_LAUNCH_SCREEN_SIZES` in `app.js`) are images of the app: retake them when its look changes.
+- **Web App Manifest**: Ensures the app feels native with proper icons, theme colors, and display modes, plus screenshots for the install dialog (see Install Images below).
 
 ### City Data
 `src/cities/` holds one JSON file per country with every place of 5,000+ people (Arabic name, coordinates, population, time zone), plus `index.json` with each country's bounding box. It is generated from [GeoNames](https://www.geonames.org/). To refresh it (downloads ~210 MB once, into the folder you pass):
 ```bash
 python scripts/build-cities.py path/to/download-folder
+```
+
+### Install Images
+The install dialog's screenshots (`src/screenshots/`), the iPhone launch screens (`src/splash/`, one per size in `IOS_LAUNCH_SCREEN_SIZES` in `app.js`) and the maskable, iPhone and shortcut icons are drawn from the app itself. Retake them when its look changes; the script drives the installed Chrome or Edge (set `CHROME` to its path if it isn't found) and checks that Chrome still finds the app installable:
+```bash
+node scripts/make-install-assets.mjs
 ```
 
 ### DevOps & CI/CD
