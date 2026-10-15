@@ -75,8 +75,9 @@ jobs:
            echo "Copying manifest, icons, and other assets from src/ to dist/..."
            # Copy manifest
            cp src/manifest.json dist/manifest.json || echo "Warning: src/manifest.json not found."
-           # Copy all PNG images
+           # Copy all PNG images, and the link-preview image
            cp src/*.png dist/ 2>/dev/null || echo "Info: No *.png files found in src/."
+           cp src/og-image.jpg dist/
            # Copy favicons
            cp src/favicon.ico dist/ 2>/dev/null || echo "Info: No favicon.ico found in src/."
            # Note: favicon-96x96.png and apple-touch-icon.png are covered by *.png
