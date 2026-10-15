@@ -972,7 +972,8 @@
           longitude,
           locationDay(now, dayOffset),
           methodKey,
-          madhab
+          madhab,
+          locationDay
         );
 
       appState.currentPrayerTimes = timesForDay(0);
@@ -1702,7 +1703,7 @@
     const rows = [];
     for (let i = 0; i < 14; i++) {
       const date = locationDay(new Date(), i);
-      const times = prayerRules.prayerTimes(latitude, longitude, date, methodKey, madhab);
+      const times = prayerRules.prayerTimes(latitude, longitude, date, methodKey, madhab, locationDay);
       // data-label / data-day feed the phone carousel (CSS labels and dot names)
       const cells = PRAYER_DISPLAY_ORDER.map(
         (key) =>
@@ -1766,7 +1767,14 @@
     for (let i = 0; i < CALENDAR_DAYS; i++) {
       const day = locationDay(now, i);
       const dayId = day.getFullYear() * 10000 + (day.getMonth() + 1) * 100 + day.getDate();
-      const times = prayerRules.prayerTimes(location.latitude, location.longitude, day, methodKey, madhab);
+      const times = prayerRules.prayerTimes(
+        location.latitude,
+        location.longitude,
+        day,
+        methodKey,
+        madhab,
+        locationDay
+      );
       for (const key of PRAYER_DISPLAY_ORDER) {
         const time = times[key];
         // Sunrise isn't a prayer; passed times would show overdue reminders in some calendars, and
