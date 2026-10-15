@@ -1,13 +1,15 @@
-# <img src="src/favicon.svg" width="32" height="32" style="vertical-align: middle;"> Prayer Times PWA (مواقيت الصلاة)
+# <img src="src/favicon-96x96.png" width="32" height="32" style="vertical-align: middle;"> Prayer Times PWA (مواقيت الصلاة)
 
 A lightweight, accurate, and offline-capable Progressive Web Application (PWA) for displaying prayer times, Hijri/Gregorian dates, and countdowns to the next prayer. Built with performance and user experience in mind.
 
 ## 🚀 Features
 
-- **Accurate Prayer Times**: Calculations based on your location using the `adhan.js` library.
-- **Offline Support**: Fully functional offline usage thanks to a robust Service Worker.
+- **City-centre prayer times**: Your position is matched to your city's centre, like the timetables mosques publish, or you pick the city by hand. Times are calculated with `adhan.js`; a city picked by hand shows its own clock.
+- **Checked against official timetables**: `node scripts/check-times.js` compares the app with the times 20 authorities publish for 23 cities: Umm al-Qura, Diyanet, JAKIM, MUIS, Kemenag, Egypt's Survey Authority, the Jordanian, Moroccan, Omani, Bahraini and Algerian ministries, Qatar, Banuri Town (Karachi), the Moonsighting Committee (London, New York), the UAE's Awqaf (Abu Dhabi, Dubai), Iraq's Sunni Endowment, Sudan's Fiqh Academy, Libya's Dar al-Ifta, Tunisia's meteorology institute and the Islamic Foundation Bangladesh. Every checked day is within a minute, or two for one day of Makkah and for Tunis's winter Asr. Kuwait and India aren't checked: neither publishes a timetable online that the check can use.
+- **Private and free to run**: No third-party requests at all. City data, fonts and icons are served with the app, and your location never leaves the device.
+- **Offline Support**: The app opens from the Service Worker cache, so it starts instantly and works offline.
 - **PWA support**: Installable on mobile and desktop devices.
-- **Customizable**: Supports multiple calculation methods (Muslim World League, Umm Al-Qura, ISNA, etc.).
+- **Customizable**: Multiple calculation methods (Muslim World League, Umm Al-Qura, Diyanet, JAKIM, Kemenag, Jordan, Morocco, Moonsighting Committee, etc.), chosen per country by default, plus a Shafi/Hanafi Asr setting. Country defaults and method details live in `src/prayer-rules.js`.
 - **Themes**: Dark and Light mode support.
 - **Arabic UI**: Designed with a clean Arabic interface (Right-to-Left).
 
@@ -29,14 +31,20 @@ This project leverages modern web technologies to ensure speed, reliability, and
 - **[Adhan.js](https://github.com/batoulapps/adhan-js)**: A well-tested library for calculating prayer times.
 
 ### Progressive Web App (PWA)
-- **Service Worker (`sw.js`)**: Implements advanced caching strategies:
-  - **App Shell Strategy**: Caches critical assets (HTML, CSS, JS) on install for instant loading.
-  - **Stale-While-Revalidate**: Updates non-critical assets in the background.
-  - **Offline Fallback**: Serves a custom offline page if the network is unavailable.
+- **Service Worker (`sw.js`)**:
+  - **App Shell, cache-first**: The page, scripts, styles and fonts are cached on install, so launches never wait on the network. Bump `APP_SHELL_CACHE_NAME` whenever one of them changes.
+  - **Stale-While-Revalidate**: City files are cached on first use and refreshed in the background.
 - **Web App Manifest**: Ensures the app feels native with proper icons, theme colors, and display modes.
+
+### City Data
+`src/cities/` holds one JSON file per country with every place of 5,000+ people (Arabic name, coordinates, population, time zone), plus `index.json` with each country's bounding box. It is generated from [GeoNames](https://www.geonames.org/). To refresh it (downloads ~210 MB once, into the folder you pass):
+```bash
+python scripts/build-cities.py path/to/download-folder
+```
 
 ### DevOps & CI/CD
 - **GitHub Actions**: A fully automated pipeline that **commits directly to production** (deploys to Cloudflare Pages).
+  - **Accuracy Check**: The workflow first runs `node scripts/check-times.js`. If the times drift from the official timetables, the build fails and nothing is deployed.
   - **Automated Minification**: The workflow automatically minifies HTML, CSS, and JavaScript files to optimize load times.
   - **Artifact Management**: Builds and uploads production-ready artifacts.
   - **Cloudflare Pages Deployment**: Deploys the optimized build directly to the global edge network.
@@ -75,4 +83,7 @@ No manual build or upload steps are required.
 
 ## 📄 License
 
-This project is licensed under the ISC License.
+This project is licensed under the ISC License. Bundled third-party material:
+- City data © [GeoNames](https://www.geonames.org/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- [Tajawal](https://fonts.google.com/specimen/Tajawal) font, SIL Open Font License (`src/fonts/OFL.txt`).
+- [Material Symbols](https://fonts.google.com/icons) icons, Apache License 2.0.

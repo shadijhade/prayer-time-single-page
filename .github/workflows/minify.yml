@@ -21,6 +21,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      # Fails the build, and so blocks the deploy, if the times drift from the official timetables
+      - name: Check prayer times against official timetables
+        run: node scripts/check-times.js
+
       - name: Install Dependencies (at root)
         run: npm ci
 
@@ -30,7 +34,7 @@ jobs:
       # --- Minification Steps (Keep these as you had them) ---
       - name: Minify HTML files (from src to dist)
         run: |
-          # Find index.html and offline.html within src
+          # Find the HTML files (index.html) within src
           find ./src -maxdepth 1 -name "*.html" -print | while read file; do
             filename=$(basename "$file") # Get just the filename (e.g., index.html)
             output_file="dist/${filename}"
@@ -74,8 +78,9 @@ jobs:
            cp src/*.png dist/ 2>/dev/null || echo "Info: No *.png files found in src/."
            # Copy favicons
            cp src/favicon.ico dist/ 2>/dev/null || echo "Info: No favicon.ico found in src/."
-           cp src/favicon.svg dist/ 2>/dev/null || echo "Info: No favicon.svg found in src/."
            # Note: favicon-96x96.png and apple-touch-icon.png are covered by *.png
+           # Self-hosted fonts and the GeoNames city files; the app needs both, so no fallback
+           cp -r src/fonts src/cities dist/
 
       - name: List dist directory contents (for debugging)
         run: ls -la dist

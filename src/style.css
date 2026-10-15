@@ -1,34 +1,86 @@
 /* ========================================= */
+/* FONTS: self-hosted Tajawal (fonts/OFL.txt), Arabic + Latin subsets as Google Fonts serves them */
+/* ========================================= */
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/tajawal-400-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/tajawal-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/tajawal-500-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/tajawal-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/tajawal-700-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: "Tajawal";
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/tajawal-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ========================================= */
 /* VARIABLES                               */
 /* ========================================= */
 :root {
-  /* -- Colors -- */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card-background: #ffffff;
+  /* Follows the OS theme until app.js applies .light-theme / .dark-theme.
+     Themed colors are light-dark() pairs, so there is no separate dark palette. */
+  color-scheme: light dark;
+
+  /* -- Colors (light, dark) -- */
+  --background: light-dark(#f8fafc, #0f172a);
+  --foreground: light-dark(#0f172a, #f8fafc);
+  --card-background: light-dark(#ffffff, #1e293b);
   --card-foreground: var(--foreground);
   --primary: #14b8a6;
-  --pink: #fd9be0;
   /* Teal */
-  --primary-foreground: #ffffff;
+  --primary-hover: light-dark(#0d9488, #2dd4bf);
+  --primary-foreground: light-dark(#ffffff, #0f172a);
   --primary-rgb: 20, 184, 166;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #94a3b8;
-  --muted-foreground: #64748b;
+  --primary-soft: light-dark(rgba(var(--primary-rgb), 0.1), rgba(var(--primary-rgb), 0.15));
+  --outline-accent: light-dark(#14b8a6, #67e8f9);
+  /* Outline buttons: teal on light, cyan on dark */
+  --secondary: light-dark(#f1f5f9, #334155);
+  --secondary-foreground: var(--foreground);
+  --muted: light-dark(#94a3b8, #475569);
+  --muted-foreground: light-dark(#64748b, #94a3b8);
   --accent: #f59e0b;
-  --error: #f51f0b;
   /* Amber */
-  --border: #e2e8f0;
-  --ring: #a5f3fc;
-  /* Light Cyan for focus rings */
+  --error: #f51f0b;
+  --border: light-dark(#e2e8f0, #334155);
+  --shadow-color: light-dark(rgba(15, 23, 42, 0.08), rgba(0, 0, 0, 0.3));
+  --glow-color: light-dark(rgba(var(--primary-rgb), 0.12), rgba(var(--primary-rgb), 0.08));
   --toggle-moon-color: hsl(240, 100%, 95%);
   --toggle-sun-color: hsl(40, 100%, 50%);
 
   /* -- Layout & Sizing -- */
-  --radius: 0.5rem;
+  --radius: 0.875rem;
   --radius-sm: calc(var(--radius) / 2);
-  --radius-xs: calc(var(--radius) / 3);
   --max-width: 1200px;
   --header-padding-y: 1.5rem;
   --header-padding-x: 2rem;
@@ -62,16 +114,14 @@
   /* ~29px */
   --font-size-3xl: 2.2rem;
   /* ~35px */
-  --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
   /* -- Effects & Transitions -- */
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
-    0 2px 4px -2px rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 3px 0 var(--shadow-color);
+  --shadow-md: 0 4px 6px -1px var(--shadow-color), 0 2px 4px -2px var(--shadow-color);
+  --shadow-lg: 0 12px 32px -8px var(--shadow-color);
   --transition-duration-fast: 200ms;
   --transition-duration-base: 300ms;
   --transition-duration-slow: 500ms;
@@ -79,22 +129,17 @@
   --transition-easing-out: ease-out;
   --transition-easing-in-out: ease-in-out;
   --transition-cubic-bezier: cubic-bezier(0.25, 0.8, 0.25, 1);
-  /* For toast */
-  --primary-hover-bg-opacity: 0.1;
-  --primary-active-brightness: 0.9;
 
   /* -- Component Specific -- */
   --cursor-light-size: 600px;
   --card-glow-size: 60%;
-  --card-glow-intensity: 0.4;
+  --card-glow-intensity: 0.35;
   --card-glow-inset: -15px;
   --card-glow-blur-radius-factor: 10px;
   /* Keep as px if needed for specific blur effect */
   --toggle-size: 1.5rem;
   --toggle-transition-duration: var(--transition-duration-slow);
-  --toast-z-index: 1001;
-  --notification-z-index: 1000;
-  --header-z-index: 10;
+
   /* -- Z-Indexes -- */
   --z-base: 0;
   --z-raised: 1;
@@ -102,40 +147,19 @@
   --z-card: 2;
   /* Cards */
   --z-sticky: 5;
-  /* Sticky elements if any */
-  --z-header: var(--header-z-index);
-  --z-overlay: 900;
-  --z-notification: var(--notification-z-index);
-  --z-toast: var(--toast-z-index);
-  --z-modal: 1100;
+  /* Sticky countdown pill */
+  --z-header: 10;
+  --z-notification: 1000;
+  --z-toast: 1001;
 }
 
-/* ========================================= */
-/* DARK THEME OVERRIDES                    */
-/* ========================================= */
-html.dark-theme {
-  /* -- Colors -- */
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card-background: #1e293b;
-  --card-foreground: var(--foreground);
-  --primary-foreground: #0f172a;
-  --secondary: #334155;
-  --secondary-foreground: #f8fafc;
-  --muted: #475569;
-  --muted-foreground: #94a3b8;
-  --border: #334155;
-  --ring: #67e8f9;
-  /* Brighter Cyan for dark mode focus */
+/* Explicit theme picked with the toggle (set by app.js) */
+:root.light-theme {
+  color-scheme: light;
+}
 
-  /* -- Effects & Transitions -- */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.15),
-    0 2px 6px -2px rgba(0, 0, 0, 0.15);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --card-glow-intensity: 0.3;
-  --primary-hover-bg-opacity: 0.15;
-  --primary-active-brightness: 1.1;
+:root.dark-theme {
+  color-scheme: dark;
 }
 
 /* ========================================= */
@@ -148,16 +172,10 @@ html.dark-theme {
   padding: 0;
   box-sizing: border-box;
   border-color: var(--border);
-  /* Apply transitions more selectively if needed, but this is a simple default */
-  transition: background-color var(--transition-duration-base) var(--transition-easing),
-    color var(--transition-duration-fast) var(--transition-easing),
-    border-color var(--transition-duration-base) var(--transition-easing);
-  font-family: var(--font-family-sans);
 }
 
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 5px;
+[hidden] {
+  display: none !important;
 }
 
 html {
@@ -173,15 +191,35 @@ body {
   color: var(--foreground);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-base);
-  min-height: 100vh;
+  min-height: 100dvh;
+  /* dvh: ignores mobile browser toolbars */
   display: flex;
   flex-direction: column;
   overscroll-behavior-y: contain;
   line-height: 1.5;
 }
 
-.material-symbols-rounded {
-  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" -25, "opsz" 24;
+button,
+select {
+  font: inherit;
+}
+
+h1,
+h2 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* Inline SVG icons from the sprite in index.html; 24px like the Material Symbols font they replace */
+.icon {
+  width: 1em;
+  height: 1em;
+  font-size: 24px;
+  fill: currentColor;
+  flex-shrink: 0;
 }
 
 .visually-hidden {
@@ -194,7 +232,6 @@ body {
   position: absolute;
   width: 1px;
   white-space: nowrap;
-  /* Optional: prevents line breaks if text wraps */
 }
 
 /* ========================================= */
@@ -232,14 +269,29 @@ header h1 {
 
 .hijri-date,
 .gregorian-date {
-  /* Reset any potential inherited padding/border */
-  padding: 0;
-  border-radius: 0;
   font-weight: var(--font-weight-medium);
 }
 
 .day-of-week {
   font-weight: var(--font-weight-bold);
+}
+
+/* "متبقي 116 يومًا على رمضان" chip under the dates */
+.occasion-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  margin-top: var(--gap-sm);
+  padding: var(--gap-xs) var(--gap-md);
+  border-radius: 999px;
+  background-color: var(--primary-soft);
+  color: var(--outline-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.occasion-countdown .icon {
+  font-size: 1.1em;
 }
 
 .location-container {
@@ -256,50 +308,79 @@ header h1 {
   color: var(--primary);
 }
 
-.location-button {
+/* --- Outline Buttons (location, city, forecast) --- */
+.location-button,
+.forecast-button {
   background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  padding: 0.4rem 0.9rem;
-  /* Keep specific padding or derive from variables */
+  color: var(--outline-accent);
+  border: 1px solid var(--outline-accent);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-duration-fast) var(--transition-easing);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  margin-top: var(--gap-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--gap-sm);
+  font-weight: var(--font-weight-medium);
+  transition: background-color var(--transition-duration-fast) var(--transition-easing);
   -webkit-tap-highlight-color: transparent;
   /* Remove tap highlight on touch devices */
 }
 
-.location-button:hover {
-  background-color: rgba(var(--primary-rgb), var(--primary-hover-bg-opacity));
+.location-button:hover,
+.forecast-button:hover {
+  background-color: var(--primary-soft);
 }
 
-.location-button:focus-visible {
+.location-button:focus-visible,
+.forecast-button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
-.location-button:disabled {
-  opacity: 0.6;
+.location-button:disabled,
+.forecast-button:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
   background-color: transparent;
-  /* Ensure hover effect is removed */
 }
 
-/* Specific Dark Theme Adjustments for Location Button */
-html.dark-theme .location-button {
-  color: var(--ring);
-  border-color: var(--ring);
+.location-button {
+  padding: 0.4rem 0.9rem;
+  font-size: var(--font-size-sm);
 }
 
-html.dark-theme .location-button:disabled {
-  opacity: 0.5;
+.location-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gap-sm);
+  margin-top: var(--gap-lg);
+}
+
+/* --- Icon-only Buttons (PiP, close) --- */
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background-color var(--transition-duration-fast) var(--transition-easing),
+    color var(--transition-duration-fast) var(--transition-easing);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icon-button:hover {
+  background-color: var(--secondary);
+  color: var(--foreground);
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* --- Main Content Area --- */
@@ -311,7 +392,8 @@ main {
   position: relative;
   /* For cursor light positioning */
   overflow: hidden;
-  /* Contain cursor light */
+  overflow: clip;
+  /* Contain cursor light; clip (unlike hidden) can't be scrolled into, even by scrollIntoView */
 }
 
 /* Center content within main */
@@ -339,7 +421,6 @@ footer {
 
 /* --- Cursor Light Effect --- */
 #cursor-light {
-  /* Common styles for both desktop & mobile base state */
   position: absolute;
   /* Position relative to nearest positioned ancestor (main) */
   width: var(--cursor-light-size);
@@ -349,61 +430,23 @@ footer {
   z-index: var(--z-base);
   /* Below content */
   will-change: transform, opacity;
-  /* Optimization hint */
-
-  /* Default Background (can be overridden by dark theme) */
-  --glow-intensity: 0.12;
-  /* Define intensity var */
-  --glow-size: 60%;
-  /* Define size var */
   background: radial-gradient(circle,
-      rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
-      rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
-      transparent var(--glow-size));
+      var(--glow-color) 0%,
+      color-mix(in srgb, var(--glow-color) 66%, transparent) 25%,
+      transparent 60%);
 
-  /* --- DESKTOP SPECIFIC Defaults --- */
-  /* (Will be overridden on mobile by media query) */
+  /* Desktop: hidden until the mouse enters main (app.js moves it) */
   top: 0;
   left: 0;
   transform: translate(-50%, -50%);
-  /* Start off-center for initial placement */
   opacity: 0;
-  /* Start hidden on desktop */
-  transition: opacity var(--transition-duration-base) var(--transition-easing),
-    transform 0s linear,
-    /* No transition for desktop positioning */
-    background var(--transition-duration-base) var(--transition-easing);
-  /* Theme transition */
-}
-
-html.dark-theme #cursor-light {
-  /* Dark theme overrides */
-  --glow-intensity: 0.08;
-  /* Adjust dark theme intensity if needed */
-  background: radial-gradient(circle,
-      rgba(var(--primary-rgb), var(--glow-intensity)) 0%,
-      rgba(var(--primary-rgb), calc(var(--glow-intensity) * 0.66)) 25%,
-      transparent var(--glow-size));
+  transition: opacity var(--transition-duration-base) var(--transition-easing);
 }
 
 /* --- Base Card Styling --- */
-.card-base {
-  position: relative;
-  z-index: var(--z-card);
-  /* Changed to --z-card for consistency */
-  background-color: var(--card-background);
-  color: var(--card-foreground);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-/* Apply base styles to card-like elements */
 .next-prayer-info,
 .prayer-card,
 .calculation-method {
-  /* Inherit base card styles - Less repetition */
   position: relative;
   z-index: var(--z-raised);
   /* Sit above cursor light */
@@ -415,17 +458,11 @@ html.dark-theme #cursor-light {
   border: 1px solid var(--border);
 }
 
-html.dark-theme .next-prayer-info,
-html.dark-theme .prayer-card,
-html.dark-theme .calculation-method {
-  box-shadow: var(--shadow-sm);
-  /* Use variable for dark shadow */
-}
-
 /* --- Next Prayer Info Card --- */
 .next-prayer-info {
   margin-bottom: var(--gap-2xl);
   text-align: center;
+  background-image: linear-gradient(160deg, var(--primary-soft), transparent 65%);
 }
 
 .next-prayer-info h2 {
@@ -446,8 +483,9 @@ html.dark-theme .calculation-method {
 }
 
 .next-prayer-info .countdown {
-  font-size: var(--font-size-3xl);
+  font-size: clamp(var(--font-size-3xl), 9vw, 3.25rem);
   font-weight: var(--font-weight-bold);
+  line-height: 1.2;
   color: var(--primary);
   margin-top: var(--gap-sm);
   direction: ltr;
@@ -456,28 +494,194 @@ html.dark-theme .calculation-method {
   /* Keep numbers aligned */
 }
 
+/* Share of the time between the previous and the next prayer that has passed (--progress from app.js) */
+.countdown-progress {
+  height: 6px;
+  max-width: 20rem;
+  margin: var(--gap-md) auto 0;
+  border-radius: 999px;
+  background-color: var(--secondary);
+  overflow: hidden;
+}
+
+.countdown-progress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  background-color: var(--primary);
+  transform-origin: right;
+  /* RTL: fills from the right */
+  transform: scaleX(var(--progress, 0));
+  transition: transform 1s linear;
+}
+
+.next-prayer-info .countdown-description {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--muted-foreground);
+  margin-top: var(--gap-sm);
+  min-height: 1.5em;
+  /* Prevent layout shift */
+}
+
+.pip-button {
+  position: absolute;
+  top: var(--gap-sm);
+  inset-inline-end: var(--gap-sm);
+}
+
+/* --- Sticky Countdown Pill ---
+   The zero-height container sits right after the next-prayer card and sticks --sticky-reveal
+   below the top edge, so it gets "stuck" once the card's big countdown has scrolled away
+   (only its bar and description may still show). The scroll-state query below then slides
+   the pill in at the top edge. Browsers without scroll-state queries never show it. */
+.sticky-countdown {
+  --sticky-reveal: 6rem;
+  position: sticky;
+  top: var(--sticky-reveal);
+  z-index: var(--z-sticky);
+  height: 0;
+  container-type: scroll-state;
+}
+
+/* Nothing to show yet (no times) or the card is in the PiP window */
+main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
+  display: none;
+}
+
+.sticky-countdown-pill {
+  position: absolute;
+  top: calc(var(--gap-sm) - var(--sticky-reveal));
+  /* At the top edge while the container is stuck */
+  inset-inline: 0;
+  width: fit-content;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding: var(--gap-sm) var(--gap-lg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--card-background) 85%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+  font-weight: var(--font-weight-bold);
+  overflow: hidden;
+  opacity: 0;
+  translate: 0 -150%;
+  visibility: hidden;
+  transition: opacity var(--transition-duration-base) var(--transition-easing-out),
+    translate var(--transition-duration-base) var(--transition-cubic-bezier),
+    visibility var(--transition-duration-base);
+}
+
+@container scroll-state(stuck: top) {
+  .sticky-countdown-pill {
+    opacity: 1;
+    translate: 0;
+    visibility: visible;
+  }
+}
+
+.sticky-countdown-time {
+  color: var(--primary);
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Same --progress as the card's bar, as a line along the pill's bottom edge */
+.sticky-countdown-pill::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3px;
+  background-color: var(--primary);
+  transform-origin: right;
+  transform: scaleX(var(--progress, 0));
+  transition: transform 1s linear;
+}
+
+/* --- Title Bar Countdown ---
+   An installed desktop app can hide its title bar (Window Controls Overlay); the next prayer and
+   its countdown then fill the title bar area, which stays draggable like the real one. */
+.titlebar {
+  display: none;
+}
+
+@media (display-mode: window-controls-overlay) {
+  .titlebar {
+    position: fixed;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 2.25rem);
+    z-index: var(--z-header);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-md);
+    background-color: var(--background);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  body {
+    padding-top: env(titlebar-area-height, 0);
+  }
+
+  /* The title bar already shows the countdown */
+  .sticky-countdown {
+    display: none;
+  }
+}
+
 /* --- Prayer Times Grid & Cards --- */
+.prayer-times-section {
+  /* Columns follow the section width, not the viewport */
+  container-type: inline-size;
+}
+
 .prayer-times-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--gap-lg);
-  margin-top: var(--gap-2xl);
   position: relative;
   z-index: var(--z-raised);
   /* Ensure grid is above cursor light */
 }
 
+@container (min-width: 560px) {
+  .prayer-times-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@container (min-width: 1000px) {
+  .prayer-times-container {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
 .prayer-card {
   text-align: center;
-  position: relative;
   overflow: hidden;
   /* Contain the glow */
-  /* Inherits base card styles */
   transition: background-color var(--transition-duration-fast) var(--transition-easing-in-out),
     color var(--transition-duration-fast) var(--transition-easing-in-out),
     border-color var(--transition-duration-fast) var(--transition-easing-in-out),
-    transform var(--transition-duration-fast) var(--transition-easing-in-out),
+    opacity var(--transition-duration-base) var(--transition-easing-in-out),
     box-shadow var(--transition-duration-fast) var(--transition-easing-in-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .prayer-card {
+    animation: rise-in 0.5s var(--transition-cubic-bezier) backwards;
+    /* Staggered entrance where sibling-index() is supported; elsewhere the delay is dropped */
+    animation-delay: calc(sibling-index() * 60ms);
+  }
 }
 
 .prayer-card::before {
@@ -502,26 +706,14 @@ html.dark-theme .calculation-method {
   box-shadow: var(--shadow-md);
 }
 
-html.dark-theme .prayer-card:hover {
-  box-shadow: var(--shadow-md);
-  /* Use variable */
-}
-
 .prayer-card.active {
   background-color: var(--primary);
   color: var(--primary-foreground);
   border-color: var(--primary);
-  transform: none;
-  /* Override potential hover transforms */
   box-shadow: var(--shadow-md);
-  /* Keep consistent shadow */
   z-index: var(--z-card);
-  /* Ensure active card is slightly more prominent if needed */
-}
-
-html.dark-theme .prayer-card.active {
-  box-shadow: var(--shadow-md);
-  /* Use variable */
+  /* The View Transition morphs this between cards when the next prayer changes */
+  view-transition-name: active-prayer;
 }
 
 .prayer-card.active::before {
@@ -531,8 +723,13 @@ html.dark-theme .prayer-card.active {
 
 .prayer-card.active .prayer-name,
 .prayer-card.active .prayer-time,
-.prayer-card.active .prayer-remaining {
+.prayer-card.active .prayer-icon {
   color: var(--primary-foreground);
+}
+
+/* Prayers already behind us today */
+.prayer-card.passed {
+  opacity: 0.55;
 }
 
 .prayer-name {
@@ -541,13 +738,9 @@ html.dark-theme .prayer-card.active {
   margin-bottom: var(--gap-md);
   color: var(--card-foreground);
   display: flex;
-  /* Arrange icon and text side-by-side */
   align-items: center;
-  /* Vertically align icon and text */
   justify-content: center;
-  /* Keep content centered in the card */
   gap: var(--gap-sm);
-  /* Add space between icon and text */
 }
 
 .prayer-icon {
@@ -559,7 +752,6 @@ html.dark-theme .prayer-card.active {
 .prayer-time {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  margin-bottom: var(--gap-sm);
   color: var(--card-foreground);
   font-variant-numeric: tabular-nums;
 }
@@ -568,86 +760,115 @@ html.dark-theme .prayer-card.active {
 .prayer-time.skeleton,
 .skeleton-text {
   color: var(--muted-foreground) !important;
-  letter-spacing: 1.2;
-}
-
-.prayer-remaining {
-  font-size: var(--font-size-xs);
-  color: var(--muted-foreground);
-  min-height: 1.2em;
-  /* Prevent layout shift */
-  margin-top: var(--gap-sm);
-}
-
-.prayer-remaining:empty {
-  display: none;
-}
-
-.prayer-card.active .prayer-remaining {
-  font-weight: var(--font-weight-medium);
-  /* color: var(--primary-foreground); */
-  /* Already handled by .active */
-}
-
-.prayer-card.active .prayer-icon {
-  color: var(--primary-foreground);
-  /* Match active text color */
 }
 
 /* --- Calculation Method Selector --- */
 .calculation-method {
   margin-top: var(--gap-2xl);
-  /* Inherits base card styles */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gap-md) var(--gap-lg);
 }
 
-.calculation-method h2 {
-  color: var(--foreground);
-  margin-bottom: var(--gap-lg);
+.method-label {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
 }
 
-.method-selector {
-  display: flex;
-  gap: var(--gap-md);
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-
-.method-btn {
+.method-select {
+  flex: 1 1 16rem;
+  max-width: 28rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background-color: var(--card-background);
   color: var(--foreground);
-  border: 1px solid var(--border);
-  padding: var(--gap-sm) var(--gap-lg);
-  /* Use gap vars for padding */
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-duration-fast) var(--transition-easing);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
 }
 
-.method-btn:focus-visible {
+.method-select:hover {
+  border-color: var(--muted);
+}
+
+.method-select:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
-.method-btn:hover {
-  background-color: var(--secondary);
-  border-color: var(--muted);
-}
+/* Customizable <select> (Chromium): styled, animated picker. Other browsers keep the native control. */
+@supports (appearance: base-select) {
 
-/* Dark theme hover already covered by variable transitions */
+  .method-select,
+  .method-select::picker(select) {
+    appearance: base-select;
+  }
 
-.method-btn.active {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border-color: var(--primary);
-}
+  .method-select {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-sm);
+  }
 
-.method-btn.active:hover {
-  filter: brightness(var(--primary-active-brightness));
+  .method-select::picker-icon {
+    color: var(--primary);
+    transition: rotate var(--transition-duration-fast) var(--transition-easing);
+  }
+
+  .method-select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  .method-select::picker(select) {
+    padding: var(--gap-xs);
+    margin-block: var(--gap-xs);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--card-background);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    translate: 0 -0.5rem;
+    transition: opacity var(--transition-duration-fast) var(--transition-easing-out),
+      translate var(--transition-duration-fast) var(--transition-easing-out),
+      display var(--transition-duration-fast) allow-discrete,
+      overlay var(--transition-duration-fast) allow-discrete;
+  }
+
+  .method-select:open::picker(select) {
+    opacity: 1;
+    translate: 0;
+  }
+
+  @starting-style {
+    .method-select:open::picker(select) {
+      opacity: 0;
+      translate: 0 -0.5rem;
+    }
+  }
+
+  .method-select option {
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius-sm);
+    gap: var(--gap-sm);
+  }
+
+  .method-select option:hover,
+  .method-select option:focus-visible {
+    background-color: var(--secondary);
+    outline: none;
+  }
+
+  .method-select option:checked {
+    background-color: var(--primary-soft);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .method-select option::checkmark {
+    color: var(--primary);
+  }
 }
 
 /* --- Toast Notifications --- */
@@ -655,7 +876,6 @@ html.dark-theme .prayer-card.active {
   position: fixed;
   top: 1rem;
   right: 1rem;
-  /* Adjusted for consistency */
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
@@ -692,12 +912,6 @@ html.dark-theme .prayer-card.active {
 .toast button:focus-visible,
 .toast button:focus-within {
   outline: none;
-  /* Style focus differently if needed */
-}
-
-html.dark-theme .toast {
-  box-shadow: var(--shadow-lg);
-  /* Use variable */
 }
 
 .toast.show,
@@ -736,9 +950,7 @@ html.dark-theme .toast {
 }
 
 .toast .toast-close {
-  position:relative;
-  top:0px;
-  bottom:0px;
+  position: relative;
   background: none;
   border: none;
   color: var(--muted-foreground);
@@ -777,7 +989,6 @@ html.dark-theme .toast {
 
 .toggle {
   --size: var(--toggle-size);
-  /* Use variable */
   appearance: none;
   outline: none;
   cursor: pointer;
@@ -796,7 +1007,7 @@ html.dark-theme .toast {
   outline-offset: 3px;
 }
 
-/* Dark Mode Toggle Checked State (Sun) */
+/* Light Mode Toggle Checked State (Sun) */
 .toggle:checked {
   --ray-size: calc(var(--size) * -0.45);
   --offset-orthogonal: calc(var(--size) * 0.71);
@@ -856,17 +1067,15 @@ html.dark-theme .toast {
   color: var(--primary-foreground);
   border: none;
   padding: 0.4rem 0.8rem;
-  /* Specific padding or use variables */
   border-radius: var(--radius-sm);
   cursor: pointer;
   margin-right: var(--gap-md);
-  /* Use gap */
   font-weight: var(--font-weight-medium);
-  transition: filter var(--transition-duration-fast) var(--transition-easing);
+  transition: background-color var(--transition-duration-fast) var(--transition-easing);
 }
 
 #update-notification button:hover {
-  filter: brightness(var(--primary-active-brightness));
+  background-color: var(--primary-hover);
 }
 
 /* ========================================= */
@@ -874,239 +1083,341 @@ html.dark-theme .toast {
 /* ========================================= */
 
 .forecast-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gap-sm);
   margin-top: var(--gap-2xl);
-  text-align: center;
-  /* Center the button */
 }
 
 .forecast-button {
-  background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
   padding: 0.6rem 1.2rem;
-  /* Adjusted padding */
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-duration-fast) var(--transition-easing);
   font-size: var(--font-size-base);
-  /* Slightly larger */
-  font-weight: var(--font-weight-medium);
-  display: inline-flex;
-  gap: var(--gap-sm);
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
 }
 
-.forecast-button:hover {
-  background-color: rgba(var(--primary-rgb), var(--primary-hover-bg-opacity));
-}
-
-.forecast-button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.forecast-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background-color: transparent;
-  border-color: var(--muted);
-  color: var(--muted);
-}
-
-html.dark-theme .forecast-button {
-  color: var(--ring);
-  border-color: var(--ring);
-}
-
-html.dark-theme .forecast-button:disabled {
-  border-color: var(--muted);
-  color: var(--muted);
-  opacity: 0.5;
-}
-
-.prayer-forecast-section {
-  margin-top: var(--gap-lg);
+/* Popover: top layer, Esc and click-outside to close, no JS.
+   Entry/exit animate via @starting-style + discrete display/overlay transitions. */
+.forecast-sheet {
+  width: min(100% - 2rem, 52rem);
+  max-height: min(85dvh, 44rem);
+  margin: auto;
+  padding: var(--card-padding);
   background-color: var(--card-background);
   color: var(--card-foreground);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  opacity: 0;
+  translate: 0 1.5rem;
+  transition: opacity var(--transition-duration-base) var(--transition-easing-out),
+    translate var(--transition-duration-base) var(--transition-cubic-bezier),
+    display var(--transition-duration-base) allow-discrete,
+    overlay var(--transition-duration-base) allow-discrete;
+}
+
+.forecast-sheet:popover-open {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  translate: 0;
+}
+
+@starting-style {
+  .forecast-sheet:popover-open {
+    opacity: 0;
+    translate: 0 1.5rem;
+  }
+}
+
+.forecast-sheet::backdrop {
+  background-color: rgb(15 23 42 / 0);
+  transition: background-color var(--transition-duration-base) var(--transition-easing-out),
+    display var(--transition-duration-base) allow-discrete,
+    overlay var(--transition-duration-base) allow-discrete;
+}
+
+.forecast-sheet:popover-open::backdrop {
+  background-color: rgb(15 23 42 / 0.45);
+}
+
+@starting-style {
+  .forecast-sheet:popover-open::backdrop {
+    background-color: rgb(15 23 42 / 0);
+  }
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  margin-bottom: var(--gap-md);
+}
+
+.sheet-header h2 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+}
+
+/* City picker: the same popover sheet, narrower, with a one-column form */
+.city-sheet {
+  width: min(100% - 2rem, 28rem);
+}
+
+.city-form {
+  display: grid;
+  gap: var(--gap-sm);
+}
+
+.city-form input {
+  cursor: text;
+}
+
+.city-form .location-button {
+  margin-top: var(--gap-md);
+}
+
+footer a {
+  color: inherit;
 }
 
 .forecast-table-container {
-  overflow-x: auto;
-  /* Enable horizontal scroll on small screens */
-  -webkit-overflow-scrolling: touch;
-  /* Smooth scrolling on iOS */
-  margin-top: var(--gap-md);
-  max-height: 60vh;
-  /* Limit height and allow vertical scroll if needed */
-  overflow-y: auto;
-  scrollbar-color: var(--foreground) transparent;
-  padding-left: 2px;
-  padding-bottom: 2px;
+  min-height: 0;
+  /* Lets the flex child shrink and scroll */
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   scrollbar-width: thin;
-}
-
-.forecast-placeholder,
-.forecast-loading,
-.forecast-error {
-  text-align: center;
-  color: var(--muted-foreground);
-  padding: var(--gap-xl) 0;
-  font-style: italic;
 }
 
 .forecast-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  /* Separate borders stay attached to the sticky cells */
+  border-spacing: 0;
   font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .forecast-table th,
 .forecast-table td {
-  border: none;
   padding: var(--gap-sm) var(--gap-md);
-  text-align: right;
-  /* Center align time */
+  text-align: center;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
 }
 
-.forecast-table th:first-child,
-/* Date column */
-.forecast-table td:first-child {
-  white-space: normal;
-  /* Allow date wrapping if needed */
-  min-width: 120px;
-  /* Give date column more space */
+.forecast-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--secondary);
+  font-weight: var(--font-weight-semibold);
 }
 
-.forecast-table tr:last-child td {
+/* Date column stays visible while scrolling sideways */
+.forecast-table th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  text-align: start;
+  font-weight: var(--font-weight-medium);
+  background-color: var(--card-background);
+}
+
+.forecast-table thead th:first-child {
+  z-index: 3;
+  background-color: var(--secondary);
+}
+
+/* Today */
+.forecast-table tbody tr:first-child>* {
+  background-color: color-mix(in srgb, var(--primary) 14%, var(--card-background));
+  font-weight: var(--font-weight-bold);
+}
+
+.forecast-table tbody tr:last-child>* {
   border-bottom: none;
 }
 
-.forecast-table th:first-child {
-  border-top-right-radius: var(--radius);
-}
+/* Phones: one swipeable day card at a time, with dots and arrow buttons generated by CSS
+   (::scroll-marker / ::scroll-button, Chromium). Other browsers keep the scrollable table. */
+@supports selector(::scroll-marker) {
+  @media (max-width: 600px) {
+    .forecast-table-container {
+      overflow: visible;
+      /* The row of days scrolls instead */
+      border: 0;
+    }
 
-.forecast-table th:last-child {
-  border-top-left-radius: var(--radius);
-}
+    .forecast-table {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--gap-md) var(--gap-sm);
+    }
 
-.forecast-table th {
-  color: var(--secondary-foreground);
-  background-color: var(--card-background);
-  font-weight: var(--font-weight-semibold);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  border: none;
-  padding-top: 0;
-  padding-bottom: 0;
-  vertical-align: middle;
-  height: calc(var(--footer-padding-y) + 4px);
-  border-bottom: 1px solid var(--border);
-}
+    .forecast-table thead {
+      display: none;
+      /* Each cell carries its prayer name in data-label */
+    }
 
-.table-warpper {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
+    .forecast-table tbody {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: var(--gap-md);
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      scroll-marker-group: after;
+    }
 
-/* Ensure the hidden attribute works */
-#forecast-section[hidden] {
-  display: none;
+    .forecast-table tr {
+      flex: 0 0 100%;
+      display: flex;
+      flex-direction: column;
+      scroll-snap-align: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .forecast-table tbody th,
+    .forecast-table tbody td {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--font-size-sm);
+      padding: var(--gap-sm) var(--gap-md);
+    }
+
+    /* Day header; :first-child outranks the table's sticky date column rule */
+    .forecast-table tbody th:first-child {
+      position: static;
+      justify-content: center;
+      font-weight: var(--font-weight-bold);
+      background-color: var(--secondary);
+    }
+
+    .forecast-table tbody tr:first-child>th {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+
+    .forecast-table td::before {
+      content: attr(data-label);
+      color: var(--muted-foreground);
+    }
+
+    /* Separators inside each card (undoes the table's "no border on the last row") */
+    .forecast-table tbody tr:last-child>* {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .forecast-table tbody tr>:last-child {
+      border-bottom: none;
+    }
+
+    /* One dot per day; the current day's dot stretches into a pill */
+    .forecast-table tr::scroll-marker {
+      content: "";
+      content: "" / attr(data-day);
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 999px;
+      background-color: var(--muted);
+      transition: width var(--transition-duration-fast) var(--transition-easing),
+        background-color var(--transition-duration-fast) var(--transition-easing);
+    }
+
+    .forecast-table tr::scroll-marker:target-current {
+      width: 1.1rem;
+      background-color: var(--primary);
+    }
+
+    .forecast-table tbody::scroll-marker-group {
+      grid-row: 2;
+      grid-column: 2;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem;
+    }
+
+    .forecast-table tbody::scroll-button(inline-start),
+    .forecast-table tbody::scroll-button(inline-end) {
+      grid-row: 2;
+      width: 2.25rem;
+      height: 2.25rem;
+      border: 0;
+      border-radius: 50%;
+      background-color: var(--secondary);
+      color: var(--foreground);
+      font-size: var(--font-size-lg);
+      cursor: pointer;
+    }
+
+    /* RTL: the start (previous day) is on the right */
+    .forecast-table tbody::scroll-button(inline-start) {
+      content: "›" / "اليوم السابق";
+      grid-column: 1;
+    }
+
+    .forecast-table tbody::scroll-button(inline-end) {
+      content: "‹" / "اليوم التالي";
+      grid-column: 3;
+    }
+
+    .forecast-table tbody::scroll-button(*):disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
 }
 
 /* ========================================= */
-/* NOTIFICATION CONTROLS STYLES              */
+/* VIEW TRANSITIONS                          */
 /* ========================================= */
 
-.notification-controls {
-  margin-top: var(--gap-2xl);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--gap-sm);
-  display: none;
+/* Theme switch: the new theme is revealed in a circle growing from the toggle (--vt-x/--vt-y from app.js) */
+.theme-vt::view-transition-old(root),
+.theme-vt::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
-.notify-button {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
-  border: 1px solid var(--border);
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-duration-fast) var(--transition-easing);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  display: inline-flex;
-  gap: var(--gap-sm);
-  align-items: center;
+.theme-vt::view-transition-new(root) {
+  animation: theme-reveal 0.6s var(--transition-easing-in-out);
+}
+
+/* Keep the highlighted card inside the reveal instead of cross-fading on its own */
+.theme-vt .prayer-card.active {
+  view-transition-name: none;
+}
+
+::view-transition-group(active-prayer) {
+  animation-duration: 0.5s;
+  animation-timing-function: var(--transition-cubic-bezier);
+}
+
+/* ========================================= */
+/* PICTURE-IN-PICTURE WINDOW                 */
+/* ========================================= */
+
+/* The floating window holds only the next-prayer card */
+body.pip {
   justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-  min-width: 180px;
-  /* Ensure minimum width */
+  padding: var(--gap-sm);
 }
 
-.notify-button .icon {
-  color: var(--muted-foreground);
-  /* Default muted color for icon */
-  transition: color var(--transition-duration-fast) var(--transition-easing);
+.pip .next-prayer-info {
+  margin: 0;
 }
 
-.notify-button:hover {
-  border-color: var(--muted);
-}
-
-.notify-button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* State: Notifications Active */
-.notify-button[aria-pressed="true"] {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border-color: var(--primary);
-}
-
-.notify-button[aria-pressed="true"] .icon {
-  color: var(--primary-foreground);
-  /* Icon color when active */
-}
-
-.notify-button[aria-pressed="true"]:hover {
-  filter: brightness(var(--primary-active-brightness));
-}
-
-/* State: Disabled (e.g., permission denied) */
-.notify-button[data-state="denied"],
-.notify-button:disabled {
-  /* General disabled style */
-  opacity: 0.6;
-  cursor: not-allowed;
-  background-color: var(--secondary);
-  border-color: var(--border);
-  color: var(--muted-foreground);
-}
-
-.notify-button[data-state="denied"] .icon,
-.notify-button:disabled .icon {
-  color: var(--muted-foreground);
-}
-
-.notification-status-text {
-  font-size: var(--font-size-xs);
-  color: var(--muted-foreground);
-  min-height: 1.2em;
-  /* Prevent layout shift */
+.pip .pip-button {
+  display: none;
 }
 
 /* ========================================= */
@@ -1122,100 +1433,52 @@ html.dark-theme .forecast-button:disabled {
   }
 }
 
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    /* Example pulse: slightly larger and less opaque */
-    transform: translate(-50%, -50%) scale(1.1);
-    opacity: 0.9;
-  }
-
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
   }
 }
 
-.offline-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-height: 60vh;
-  /* Adjust as needed */
-  padding: var(--main-padding-y) var(--main-padding-x);
-  max-width: 600px;
-  /* Limit width for readability */
-  margin: auto;
-  /* Center horizontally */
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 0));
+  }
+
+  to {
+    clip-path: circle(150vmax at var(--vt-x, 50%) var(--vt-y, 0));
+  }
 }
 
-.offline-container .offline-icon {
-  font-size: 4rem;
-  /* Make icon large */
-  color: var(--muted-foreground);
-  margin-bottom: var(--gap-lg);
+@keyframes glow-drift {
+  to {
+    top: 85%;
+  }
 }
 
-.offline-container h1 {
-  font-size: var(--font-size-xl);
-  color: var(--foreground);
-  margin-bottom: var(--gap-md);
-  font-weight: var(--font-weight-bold);
-}
+/* ========================================= */
+/* PROGRESSIVE ENHANCEMENTS                  */
+/* ========================================= */
 
-.offline-container p {
-  color: var(--muted-foreground);
-  margin-bottom: var(--gap-xl);
-  font-size: var(--font-size-base);
-  line-height: 1.6;
-}
+/* Squircle corners (Chromium); squircles look tighter, so the radius grows a little */
+@supports (corner-shape: squircle) {
+  :root {
+    --radius: 1.25rem;
+  }
 
-.offline-container .retry-button {
-  /* Style similar to location or forecast button */
-  background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  transition: background-color var(--transition-duration-fast) var(--transition-easing);
-  display: inline-flex;
-  /* If you want icon + text later */
-  align-items: center;
-  gap: var(--gap-sm);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.offline-container .retry-button:hover {
-  background-color: rgba(var(--primary-rgb), var(--primary-hover-bg-opacity));
-}
-
-.offline-container .retry-button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* Dark theme adjustments for the retry button */
-html.dark-theme .offline-container .retry-button {
-  color: var(--ring);
-  /* Use a lighter color like cyan for text/border */
-  border-color: var(--ring);
-}
-
-html.dark-theme .offline-container .retry-button:hover {
-  background-color: rgba(103,
-      232,
-      249,
-      0.1);
-  /* Use the --ring color with opacity for hover */
+  .next-prayer-info,
+  .prayer-card,
+  .calculation-method,
+  .forecast-sheet,
+  .forecast-table-container,
+  .toast,
+  #update-notification,
+  .method-select,
+  .method-select::picker(select),
+  .location-button,
+  .forecast-button {
+    corner-shape: squircle;
+  }
 }
 
 /* ========================================= */
@@ -1223,52 +1486,29 @@ html.dark-theme .offline-container .retry-button:hover {
 /* ========================================= */
 @media (hover: none) and (pointer: coarse) {
 
-  /* --- MOBILE #cursor-light --- */
+  /* --- MOBILE #cursor-light: always visible, centered --- */
   #cursor-light {
-    display: block !important;
-    /* Ensure it's displayed */
-    opacity: 1 !important;
-    /* Make it always visible */
-    top: 50%;
-    /* Center vertically */
+    opacity: 1;
+    top: 15%;
     left: 50%;
-    /* Center horizontally */
-    /* Center element precisely and set base scale */
-    transform: translate(-50%, -50%) scale(1);
-    /* Remove transition on transform for this base state */
-    /* Transition only needed for background/theme changes */
-    transition: opacity var(--transition-duration-base) var(--transition-easing),
-      /* transform removed from here */
-      background var(--transition-duration-base) var(--transition-easing);
-    /* Theme transition */
+    transform: translate(-50%, -50%);
   }
 
-  /* Optional: Style for the "dancing" state triggered by JS */
-  #cursor-light.is-dancing {
-    animation: pulse 0.4s ease-out forwards;
-    /* You could also subtly change opacity or intensity here if desired */
-    /* opacity: 0.9; */
+  /* Scroll-driven animation: the glow drifts down the page as you scroll, no JS */
+  @supports (animation-timeline: scroll()) {
+    #cursor-light {
+      animation: glow-drift linear both;
+      animation-timeline: scroll(root);
+    }
   }
-
-  /* --- End MOBILE #cursor-light --- */
 
   /* --- Other Mobile overrides (like disabling desktop hover) --- */
-  .prayer-card.active {
-    /* Keep previous active card pulse or remove if distracting */
-    /* animation: mobile-active-glow 2.2s infinite ease-in-out; */
-    transform: none !important;
-    /* Still important to prevent desktop hover transforms */
-  }
-
   .prayer-card:hover {
     box-shadow: var(--shadow-sm);
-    transform: none;
   }
 
   .prayer-card.active:hover {
     box-shadow: var(--shadow-md);
-    /* Keep active shadow */
-    transform: none;
   }
 
   .prayer-card::before {
@@ -1280,7 +1520,6 @@ html.dark-theme .offline-container .retry-button:hover {
 /* --- Tablet and Smaller (<= 768px) --- */
 @media (max-width: 768px) {
   :root {
-    /* Adjust base variables for smaller screens if needed */
     --header-padding-y: 1rem;
     --header-padding-x: 1.5rem;
     --main-padding-y: 1.5rem;
@@ -1294,41 +1533,6 @@ html.dark-theme .offline-container .retry-button:hover {
 
   .prayer-time {
     font-size: var(--font-size-xl);
-  }
-
-  .next-prayer-info .countdown {
-    font-size: var(--font-size-2xl);
-  }
-
-  .next-prayer-info .countdown-description {
-    font-size: var(--font-size-sm);
-    color: var(--muted-foreground);
-    margin-top: var(--gap-sm);
-    min-height: 1.2em;
-    line-height: 1.4;
-    font-weight: var(--font-weight-medium);
-    transition: color var(--transition-duration-fast) var(--transition-easing);
-  }
-
-  /* Ensure skeleton style applies */
-  .countdown-description.skeleton-text {
-    color: var(--muted-foreground) !important;
-    background-color: transparent;
-    /* Clear any skeleton bg if not needed */
-    width: 60%;
-    margin-left: auto;
-    margin-right: auto;
-    opacity: 0.5;
-  }
-
-  .countdown-description.skeleton-text:empty::before {
-    content: "\00a0";
-    /* Non-breaking space to give it height */
-  }
-
-  .themeToggle-container {
-    top: 0.75rem;
-    left: 1rem;
   }
 
   #update-notification {
@@ -1347,13 +1551,7 @@ html.dark-theme .offline-container .retry-button:hover {
 
   .forecast-table th,
   .forecast-table td {
-    padding: var(--gap-sm) var(--gap-sm);
-  }
-
-  .notify-button {
-    font-size: var(--font-size-sm);
-    padding: 0.5rem 1rem;
-    min-width: 160px;
+    padding: var(--gap-sm);
   }
 }
 
@@ -1363,7 +1561,6 @@ html.dark-theme .offline-container .retry-button:hover {
     top: 0.5rem;
     left: 0.5rem;
     right: 0.5rem;
-    transform: translateX(0);
     width: auto;
     /* Let left/right define width */
     max-width: none;
@@ -1373,41 +1570,12 @@ html.dark-theme .offline-container .retry-button:hover {
 
   .toast {
     min-width: auto;
-    max-width: 100%;
-    /* Ensure fits within container */
-  }
-
-  .table-warpper {
-    border: none;
-  }
-
-  table.forecast-table tbody {
-    display: flex;
-    flex-direction: row;
-  }
-
-  table.forecast-table tr:last-child td {
-    border-bottom: 1px solid var(--border);
-  }
-
-  table.forecast-table th,
-  table.forecast-table td {
-    display: block;
-    height: unset;
-    padding: var(--gap-xs);
-  }
-
-  table.forecast-table thead tr {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
   }
 }
 
 /* --- Small Mobile (<= 480px) --- */
 @media (max-width: 480px) {
   :root {
-    /* Further adjustments for smallest screens */
     --header-padding-y: 1rem;
     --header-padding-x: 1rem;
     --main-padding-y: 1rem;
@@ -1418,9 +1586,8 @@ html.dark-theme .offline-container .retry-button:hover {
     --toggle-size: 1.3rem;
   }
 
-  /* Override main padding bottom to ensure space */
   main {
-    padding-bottom: var(--gap-2xl) !important;
+    padding-bottom: var(--gap-2xl);
   }
 
   header h1 {
@@ -1444,56 +1611,24 @@ html.dark-theme .offline-container .retry-button:hover {
   }
 
   .prayer-times-container {
-    grid-template-columns: 1fr 1fr;
-    /* Stack cards */
     gap: var(--gap-sm);
   }
 
-  /* Card padding adjusted via --card-padding variable */
   .prayer-name {
     font-size: var(--font-size-base);
-    /* Maybe slightly reduce gap on very small screens */
-    /* gap: var(--gap-xs); */
   }
 
-  .prayer-time {
-    font-size: var(--font-size-xl);
-  }
-
-  /* Next prayer info padding adjusted via --card-padding variable */
   .next-prayer-info h2 {
     font-size: var(--font-size-md);
   }
 
-  .next-prayer-info .countdown {
-    font-size: var(--font-size-xl);
-  }
-
-  /* Calculation method padding adjusted via --card-padding variable */
-  .calculation-method h2 {
+  .method-label {
     font-size: var(--font-size-base);
-  }
-
-  .method-selector {
-    gap: var(--gap-sm);
-  }
-
-  .method-btn {
-    padding: 0.6rem 0.8rem;
-    font-size: var(--font-size-xs);
-    width: calc(50% - (var(--gap-sm) / 2));
-    /* Two buttons per row */
-    text-align: center;
   }
 
   footer {
     padding: var(--gap-xl) var(--gap-lg);
     font-size: var(--font-size-xs);
-  }
-
-  .themeToggle-container {
-    top: 0.5rem;
-    left: 0.75rem;
   }
 
   #update-notification {
@@ -1507,9 +1642,24 @@ html.dark-theme .offline-container .retry-button:hover {
     padding: 0.3rem 0.6rem;
   }
 }
-@media (max-width: 350px) {
-  .prayer-times-container {
-    grid-template-columns: 1fr;
-    gap: var(--gap-lg);
+
+/* Less motion: no entrance, reveal or drift animations */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }

@@ -1,8 +1,17 @@
 {
+  "id": "/",
   "name": "مواقيت الصلاة",
   "short_name": "أوقات الصلاة",
+  "description": "مواقيت الصلاة لمركز مدينتك، دقيقة ومجانية وبدون إعلانات",
+  "lang": "ar",
+  "dir": "rtl",
   "start_url": "/",
+  "scope": "/",
   "display": "minimal-ui",
+  "display_override": ["window-controls-overlay"],
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  },
   "background_color": "#ffffff",
   "theme_color": "#14b8a6",
   "icons": [
@@ -15,6 +24,23 @@
       "src": "web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "استخدام موقعي الحالي",
+      "short_name": "موقعي",
+      "url": "/?action=locate"
+    },
+    {
+      "name": "اختيار المدينة",
+      "short_name": "المدينة",
+      "url": "/?action=city"
+    },
+    {
+      "name": "مواقيت 14 يومًا",
+      "short_name": "14 يومًا",
+      "url": "/?action=forecast"
     }
   ]
 }
