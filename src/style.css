@@ -602,6 +602,42 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
   transition: transform 1s linear;
 }
 
+/* --- Title Bar Countdown ---
+   An installed desktop app can hide its title bar (Window Controls Overlay); the next prayer and
+   its countdown then fill the title bar area, which stays draggable like the real one. */
+.titlebar {
+  display: none;
+}
+
+@media (display-mode: window-controls-overlay) {
+  .titlebar {
+    position: fixed;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 2.25rem);
+    z-index: var(--z-header);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-md);
+    background-color: var(--background);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  body {
+    padding-top: env(titlebar-area-height, 0);
+  }
+
+  /* The title bar already shows the countdown */
+  .sticky-countdown {
+    display: none;
+  }
+}
+
 /* --- Prayer Times Grid & Cards --- */
 .prayer-times-section {
   /* Columns follow the section width, not the viewport */

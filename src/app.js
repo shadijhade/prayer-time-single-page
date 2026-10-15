@@ -140,6 +140,9 @@
     domRefs.stickyCountdownTime = document.getElementById(
       "sticky-countdown-time"
     );
+    domRefs.titlebarPrayer = document.getElementById("titlebar-prayer");
+    domRefs.titlebarTime = document.getElementById("titlebar-time");
+    domRefs.installButton = document.getElementById("install-btn");
     domRefs.occasionCountdown = document.getElementById("occasion-countdown");
     domRefs.occasionText = document.getElementById("occasion-text");
     domRefs.pipButton = document.getElementById("pip-btn");
@@ -1132,12 +1135,13 @@
     );
     const nextName =
       PRAYER_NAMES_AR[next.key] + (next.tomorrow ? " (غداً)" : "");
+    const countdownText = domRefs.countdown?.textContent ?? "";
     setTextIfChanged(domRefs.nextPrayerName, nextName);
+    // The sticky pill and the desktop title bar repeat the next prayer and its countdown
     setTextIfChanged(domRefs.stickyNextPrayer, nextName);
-    setTextIfChanged(
-      domRefs.stickyCountdownTime,
-      domRefs.countdown?.textContent ?? ""
-    );
+    setTextIfChanged(domRefs.stickyCountdownTime, countdownText);
+    setTextIfChanged(domRefs.titlebarPrayer, nextName);
+    setTextIfChanged(domRefs.titlebarTime, countdownText);
 
     if (next !== appState.nextPrayer) {
       appState.nextPrayer = next;
@@ -1781,6 +1785,70 @@
   }
 
   // ==============================================
+  //          Installed App: Shortcuts & Install Button
+  // ==============================================
+
+  /**
+   * Runs a home-screen shortcut from manifest.json ("/?action=locate|city|forecast"). A new window
+   * gets it from its URL and from the launch queue, so running it twice must be harmless.
+   * @param {string} url - The URL the app was opened with.
+   */
+  function runLaunchAction(url) {
+    const action = new URL(url).searchParams.get("action");
+    if (!action) return;
+    const sheet = {
+      city: domRefs.citySheet,
+      // No location yet: pick a city first
+      forecast: appState.currentLocation ? domRefs.forecastSheet : domRefs.citySheet,
+    }[action];
+    if (action === "locate") domRefs.locationButton.click(); // Ignored while already locating
+    else if (sheet && !sheet.matches(":popover-open")) sheet.showPopover();
+    // Leave a plain "/" behind so a reload doesn't repeat the action
+    history.replaceState(null, "", location.pathname);
+  }
+
+  /**
+   * Shows "تثبيت التطبيق" while the app can be installed: the browser's own install prompt where it
+   * offers one (Chromium), or the Add to Home Screen steps on iPhone and iPad, which have no install API.
+   */
+  function setupInstallButton() {
+    const button = domRefs.installButton;
+    if (!button) return;
+    let installPrompt = null;
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault(); // Our button instead of the browser's mini-infobar
+      installPrompt = event;
+      button.hidden = false;
+    });
+    window.addEventListener("appinstalled", () => {
+      installPrompt = null;
+      button.hidden = true;
+    });
+
+    // ponytail: platform sniffing for iOS (iPadOS reports a Mac with touch); drop it once Safari ships an install API
+    const isIos =
+      /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isIos && !navigator.standalone) button.hidden = false;
+
+    button.addEventListener("click", async () => {
+      if (!installPrompt) {
+        showToast(
+          "للتثبيت: اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».",
+          "info",
+          8000
+        );
+        return;
+      }
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      installPrompt = null; // A prompt can only be shown once
+      if (outcome === "accepted") button.hidden = true;
+    });
+  }
+
+  // ==============================================
   //          Initialization
   // ==============================================
 
@@ -1816,6 +1884,7 @@
     // 4. Initialize Interactive Features
     initializeUiEffects(); // Setup cursor light effect (checks for touch)
     setupCountdownPip(); // Floating countdown where supported
+    setupInstallButton();
 
     // 5. Register Service Worker (for PWA features/caching/updates)
     registerServiceWorker();
@@ -1878,6 +1947,13 @@
       } catch (e) {}
     }
     refreshCityInBackground(); // Travellers: follow the user to a new city if allowed before
+
+    // Home-screen shortcuts: from this window's URL, and from later launches into this already
+    // open window (manifest launch_handler "focus-existing" focuses it instead of reloading)
+    runLaunchAction(location.href);
+    window.launchQueue?.setConsumer(
+      (params) => params.targetURL && runLaunchAction(params.targetURL)
+    );
 
     // 9. Final Log Message
     if (loadedFromStorage) {

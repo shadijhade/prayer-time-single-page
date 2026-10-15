@@ -1,7 +1,7 @@
 // sw.js: the app shell is served cache-first, so the app opens instantly and works offline
 // (prayer times are calculated on the device). City files are stale-while-revalidate.
 // Bump APP_SHELL_CACHE_NAME whenever a file in APP_SHELL_ASSETS changes, or returning users keep the old one.
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.3.0";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.4.0";
 const CITIES_CACHE_NAME = "prayer-times-cities-v1";
 
 const APP_SHELL_ASSETS = [
@@ -33,6 +33,19 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE_NAME).then((cache) => cache.addAll(requests))
   );
+  // Static routing (Chromium): the browser answers shell requests from the cache itself, without
+  // starting this worker, so a cold launch skips the worker's start-up. Elsewhere the fetch handler
+  // below does the same job. Query strings ("/?action=city") still go through the fetch handler.
+  event
+    .addRoutes?.(
+      [...APP_SHELL_PATHS].map((pathname) => ({
+        condition: {
+          urlPattern: new URLPattern({ pathname, search: "", baseURL: self.location.origin }),
+        },
+        source: "cache",
+      }))
+    )
+    .catch((error) => console.warn("SW: static routes not added", error));
   // No skipWaiting here: the page shows an "update available" bar and the user decides
 });
 
