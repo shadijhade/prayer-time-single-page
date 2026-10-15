@@ -1,15 +1,14 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.1.0";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.2.0";
 const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.2.0"; // New name drops the old full icon font
 const OFFLINE_URL = "offline.html";
 
 const APP_SHELL_ASSETS = [
-  "index.html",
+  "./", // The page itself (start_url): served cache-first, so launches never wait on the network
   "manifest.json",
   "web-app-manifest-512x512.png",
   "web-app-manifest-192x192.png",
-  "favicon.svg",
   "favicon.ico",
   "favicon-96x96.png", // Icon used for notifications
   "apple-touch-icon.png",
@@ -180,7 +179,8 @@ self.addEventListener("fetch", (event) => {
 async function cacheFirstWithOfflineFallback(request, cacheName, offlineUrl) {
   try {
     const cache = await caches.open(cacheName);
-    const cachedResponse = await cache.match(request);
+    // ignoreSearch: "/?utm_source=..." is still the cached "/"
+    const cachedResponse = await cache.match(request, { ignoreSearch: true });
     if (cachedResponse) {
       // console.log(`SW: [CacheFirst] Serving from cache: ${request.url}`);
       return cachedResponse;

@@ -1,4 +1,4 @@
-# <img src="src/favicon.svg" width="32" height="32" style="vertical-align: middle;"> Prayer Times PWA (مواقيت الصلاة)
+# <img src="src/favicon-96x96.png" width="32" height="32" style="vertical-align: middle;"> Prayer Times PWA (مواقيت الصلاة)
 
 A lightweight, accurate, and offline-capable Progressive Web Application (PWA) for displaying prayer times, Hijri/Gregorian dates, and countdowns to the next prayer. Built with performance and user experience in mind.
 

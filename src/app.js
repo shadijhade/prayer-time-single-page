@@ -7,7 +7,10 @@
 
   // --- Storage Keys ---
   const STORAGE_KEY_THEME = "theme-preference";
+  // Older versions saved auto-picked methods here too; it's read only while the location's country is unknown
   const STORAGE_KEY_PRAYER_METHOD = "preferredPrayerMethod";
+  const STORAGE_KEY_METHOD_CHOICE = "methodChoice"; // Saved only when the user picks a method
+  const STORAGE_KEY_MADHAB_CHOICE = "madhabChoice"; // Saved only when the user picks the Asr madhab
   const STORAGE_KEY_LAST_LOCATION = "lastKnownLocation";
   const STORAGE_KEY_LOCATION_CACHE_PREFIX = "locationDataCache_";
 
@@ -98,7 +101,7 @@
     SG: "Singapore",
     MY: "Singapore",
     ID: "Singapore",
-    TR: "MuslimWorldLeague",
+    TR: "Turkey",
     BD: "Karachi",
     IN: "Karachi",
     AF: "Karachi",
@@ -126,6 +129,8 @@
     KE: "Egyptian",
     DEFAULT: "MuslimWorldLeague",
   };
+  // Countries whose mosques use the Hanafi (later) Asr by default
+  const HANAFI_COUNTRIES = ["PK", "IN", "BD", "AF"];
 
   // ==============================================
   //          Application State
@@ -177,6 +182,7 @@
     domRefs.occasionText = document.getElementById("occasion-text");
     domRefs.pipButton = document.getElementById("pip-btn");
     domRefs.methodSelect = document.getElementById("method-select");
+    domRefs.madhabSelect = document.getElementById("madhab-select");
     domRefs.countdownDescription = document.getElementById(
       "countdown-description"
     );
@@ -202,6 +208,12 @@
   const remainingTimeFormat =
     Intl.DurationFormat &&
     new Intl.DurationFormat("ar-u-nu-latn", { style: "long" });
+
+  // Umm al-Qura month number of a date ("9" in Ramadan)
+  const hijriMonthFormat = new Intl.DateTimeFormat(
+    `en-u-ca-${HIJRI_CALENDAR}`,
+    { month: "numeric" }
+  );
 
   /**
    * Formats the remaining time as descriptive Arabic text, ignoring seconds.
@@ -611,14 +623,17 @@
     }
 
     const { latitude, longitude } = position.coords;
-    appState.currentLocation = { latitude, longitude, source: "user" };
+    // Same country as before until the reverse geocode says otherwise, so a failed lookup keeps the method
+    const countryCode = appState.currentLocation?.countryCode;
+    appState.currentLocation = { latitude, longitude, source: "user", countryCode };
     console.log(
       `Geolocation success: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
     );
     saveLastLocation(
       latitude,
       longitude,
-      `موقع حالي: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`
+      `موقع حالي: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+      countryCode
     );
     fetchCountryAndDisplayPrayerTimes(latitude, longitude);
   }
@@ -668,10 +683,6 @@
    */
   async function fetchCountryAndDisplayPrayerTimes(latitude, longitude) {
     const apiUrl = `${REVERSE_GEOCODE_URL}?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`;
-    const storedPreferredMethod = localStorage.getItem(
-      STORAGE_KEY_PRAYER_METHOD
-    );
-    let methodToUse = storedPreferredMethod || DEFAULT_PRAYER_METHOD;
     let locationDisplayText = `موقع: ${latitude.toFixed(
       3
     )}, ${longitude.toFixed(3)}`; // Default/fallback text
@@ -748,7 +759,7 @@
       // --- End Fetch Logic ---
     } // End if/else (cache hit/miss)
 
-    // --- Process Data (if available) & Determine Method ---
+    // --- Process Data (if available) ---
     if (geocodeData) {
       // Construct display text (use Set for unique parts)
       const locationParts = [
@@ -760,46 +771,27 @@
       const uniqueParts = [...new Set(locationParts)]; // Get unique values
       locationDisplayText = uniqueParts.join("، ") || locationDisplayText; // Use fetched/cached or fallback
 
-      const countryCode = geocodeData.countryCode?.toUpperCase(); // Ensure uppercase for map lookup
-      saveLastLocation(latitude, longitude, locationDisplayText);
-      // Determine method ONLY if NO preference is stored and country mapping exists
-      if (
-        !storedPreferredMethod &&
-        countryCode &&
-        COUNTRY_TO_METHOD_MAP[countryCode]
-      ) {
-        methodToUse = COUNTRY_TO_METHOD_MAP[countryCode];
-        try {
-          localStorage.setItem(STORAGE_KEY_PRAYER_METHOD, methodToUse);
-          console.log(
-            `Auto-set and saved method for ${countryCode}: ${methodToUse}`
-          );
-        } catch (e) {
-          console.error("Failed to save auto-set preferred method:", e);
-          // Non-critical, proceed with the determined method for this session
-        }
-      } else if (storedPreferredMethod) {
-        console.log(`Using stored preferred method: ${storedPreferredMethod}`);
-        methodToUse = storedPreferredMethod; // Ensure explicitly using stored one
-      } else {
-        // No stored preference, no country match (or failed geocode) -> use default
-        console.log(`Using default method: ${DEFAULT_PRAYER_METHOD}`);
-        methodToUse = DEFAULT_PRAYER_METHOD;
-      }
-    } else {
-      // Handle case where cache miss/expired AND fetch failed
-      console.warn(
-        "No location data available. Using stored preferred or default method."
+      appState.currentLocation.countryCode =
+        geocodeData.countryCode?.toUpperCase() ||
+        appState.currentLocation.countryCode;
+      saveLastLocation(
+        latitude,
+        longitude,
+        locationDisplayText,
+        appState.currentLocation.countryCode
       );
-      methodToUse = storedPreferredMethod || DEFAULT_PRAYER_METHOD; // Already set above, just confirming logic
     }
     // --- End Processing ---
 
     // --- Final UI Updates & Calculation ---
     if (domRefs.locationSpan)
       domRefs.locationSpan.textContent = locationDisplayText;
-    // Select the method in the UI first (falls back to the default for unknown keys), then calculate with it
-    calculateAndDisplayPrayerTimes(latitude, longitude, selectMethod(methodToUse));
+    // Fill the dropdowns for this country (unless the user picked), then calculate with them
+    calculateAndDisplayPrayerTimes(
+      latitude,
+      longitude,
+      applyLocationDefaults(appState.currentLocation.countryCode)
+    );
   }
 
   /**
@@ -834,13 +826,15 @@
    * @param {number} latitude
    * @param {number} longitude
    * @param {string} displayText - The text used to display the location.
+   * @param {string} [countryCode] - ISO country code; picks the default method and madhab on the next launch.
    */
-  function saveLastLocation(latitude, longitude, displayText) {
+  function saveLastLocation(latitude, longitude, displayText, countryCode) {
     try {
       const locationData = {
         latitude: latitude,
         longitude: longitude,
         displayText: displayText,
+        countryCode: countryCode,
         timestamp: Date.now(), // Store timestamp for potential future expiry logic
       };
       localStorage.setItem(
@@ -924,36 +918,63 @@
   //          Prayer Times Calculation & Display
   // ==============================================
 
-  /** Restores the stored calculation method and recalculates when the user picks another one. */
+  /** Fills the method and madhab dropdowns and recalculates when the user picks another value. */
   function setupMethodSelect() {
     if (!domRefs.methodSelect) {
       console.warn("Calculation method select not found.");
       return;
     }
-    selectMethod(
-      localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) || DEFAULT_PRAYER_METHOD
-    );
+    applyLocationDefaults();
     domRefs.methodSelect.addEventListener("change", handleMethodChange);
+    domRefs.madhabSelect?.addEventListener("change", handleMethodChange);
   }
 
-  /** Saves the chosen method and recalculates the times if the location is known. */
-  function handleMethodChange() {
-    const methodKey = domRefs.methodSelect.value;
+  /**
+   * Saves the user's pick (it then wins over the country default) and recalculates if the location is known.
+   * @param {Event} event - The change event of the method or madhab dropdown.
+   */
+  function handleMethodChange(event) {
+    const storageKey =
+      event.target === domRefs.madhabSelect
+        ? STORAGE_KEY_MADHAB_CHOICE
+        : STORAGE_KEY_METHOD_CHOICE;
     try {
-      localStorage.setItem(STORAGE_KEY_PRAYER_METHOD, methodKey);
+      localStorage.setItem(storageKey, event.target.value);
     } catch (e) {
-      console.error("Failed to save selected prayer method:", e);
+      console.error("Failed to save the selected setting:", e);
     }
 
     if (appState.currentLocation) {
       calculateAndDisplayPrayerTimes(
         appState.currentLocation.latitude,
         appState.currentLocation.longitude,
-        methodKey
+        domRefs.methodSelect.value
       );
     } else {
       showToast("يرجى تحديد الموقع أولاً لحساب المواقيت.", "info", 4000);
     }
+  }
+
+  /**
+   * Fills both dropdowns with the user's own picks, else the defaults for the location's country.
+   * Country defaults are never saved, so they follow the user to another country.
+   * @param {string} [countryCode] - ISO 3166-1 alpha-2 code of the location, if known.
+   * @returns {string} The method that is actually selected.
+   */
+  function applyLocationDefaults(countryCode) {
+    if (domRefs.madhabSelect) {
+      domRefs.madhabSelect.value =
+        localStorage.getItem(STORAGE_KEY_MADHAB_CHOICE) ||
+        (HANAFI_COUNTRIES.includes(countryCode) ? "Hanafi" : "Shafi");
+    }
+    const countryMethod = countryCode
+      ? COUNTRY_TO_METHOD_MAP[countryCode]
+      : localStorage.getItem(STORAGE_KEY_PRAYER_METHOD);
+    return selectMethod(
+      localStorage.getItem(STORAGE_KEY_METHOD_CHOICE) ||
+        countryMethod ||
+        DEFAULT_PRAYER_METHOD
+    );
   }
 
   /**
@@ -988,11 +1009,11 @@
 
     try {
       const coordinates = new adhan.Coordinates(latitude, longitude);
-      const params = getAdhanCalculationParameters(methodKey);
       const today = new Date();
       const timesForDay = (dayOffset) => {
         const date = new Date(today);
         date.setDate(date.getDate() + dayOffset);
+        const params = getAdhanCalculationParameters(methodKey, coordinates, date);
         return new adhan.PrayerTimes(coordinates, date, params);
       };
 
@@ -1036,17 +1057,31 @@
   }
 
   /**
-   * Gets the Adhan.js parameters for a method key, falling back to the default method.
+   * Gets the Adhan.js parameters for a method key (falling back to the default method) on one day,
+   * with the madhab from its dropdown and the high-latitude rule Adhan recommends for the location.
    * Our keys are adhan.CalculationMethod names, except ISNA (Adhan's NorthAmerica).
    * @param {string} methodKey - The method key (e.g., 'Egyptian').
-   * @returns {object} The Adhan.js parameters object (Shafi madhab, Adhan's default).
+   * @param {adhan.Coordinates} coordinates - The location.
+   * @param {Date} date - The day being calculated (Umm al-Qura's Isha changes in Ramadan).
+   * @returns {object} The Adhan.js parameters object.
    */
-  function getAdhanCalculationParameters(methodKey) {
+  function getAdhanCalculationParameters(methodKey, coordinates, date) {
     const methods = adhan.CalculationMethod;
     const name = methodKey === "ISNA" ? "NorthAmerica" : methodKey;
-    return (
+    const params = (
       Object.hasOwn(methods, name) ? methods[name] : methods[DEFAULT_PRAYER_METHOD]
     )();
+    params.madhab =
+      domRefs.madhabSelect?.value === "Hanafi"
+        ? adhan.Madhab.Hanafi
+        : adhan.Madhab.Shafi;
+    // The default rule puts both Fajr and Isha at midnight in high-latitude summers (e.g. London)
+    params.highLatitudeRule = adhan.HighLatitudeRule.recommended(coordinates);
+    // Umm al-Qura's Isha is 2 hours after Maghrib in Ramadan, not 90 minutes (Adhan's docs: add 30)
+    if (name === "UmmAlQura" && Number(hijriMonthFormat.format(date)) === 9) {
+      params.adjustments.isha = 30;
+    }
+    return params;
   }
 
   /**
@@ -1722,7 +1757,7 @@
 
     const { latitude, longitude } = appState.currentLocation;
     const coordinates = new adhan.Coordinates(latitude, longitude);
-    const params = getAdhanCalculationParameters(domRefs.methodSelect?.value);
+    const methodKey = domRefs.methodSelect?.value;
     const headerCells = PRAYER_DISPLAY_ORDER.map(
       (key) => `<th scope="col">${PRAYER_NAMES_AR[key]}</th>`
     ).join("");
@@ -1732,6 +1767,7 @@
       const date = new Date();
       date.setDate(date.getDate() + i);
       date.setHours(12, 0, 0, 0); // Midday avoids DST issues around midnight
+      const params = getAdhanCalculationParameters(methodKey, coordinates, date);
       const times = new adhan.PrayerTimes(coordinates, date, params);
       // data-label / data-day feed the phone carousel (CSS labels and dot names)
       const cells = PRAYER_DISPLAY_ORDER.map(
@@ -1890,14 +1926,17 @@
           const displayText =
             storedLocationData.displayText ||
             `موقع سابق: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`; // Fallback text
-          // Update the dropdown (falls back to the default for unknown keys)
-          const methodKey = selectMethod(
-            localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) ||
-              DEFAULT_PRAYER_METHOD
-          );
+          // Fill the dropdowns for the stored location's country (older saves have none)
+          const countryCode = storedLocationData.countryCode;
+          const methodKey = applyLocationDefaults(countryCode);
 
           // Update app state
-          appState.currentLocation = { latitude, longitude, source: "storage" };
+          appState.currentLocation = {
+            latitude,
+            longitude,
+            source: "storage",
+            countryCode,
+          };
 
           // Update UI immediately
           if (domRefs.locationSpan) {
