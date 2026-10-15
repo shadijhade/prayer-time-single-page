@@ -1,4 +1,5 @@
-// Checks the app's prayer times against official published timetables.
+// Checks the app's prayer times against official published timetables, and that every prayer
+// falls on the day it's calculated for (see DAY_CHECKS).
 // Usage: node scripts/check-times.js   (exits with 1 when a day is off; CI runs it before deploying)
 //
 // Each timetable is a few days an authority published for a city. The app's times for those days
@@ -442,5 +443,32 @@ for (const { city, country, utcOffset, source, tolerance = 1, rows } of TIMETABL
   }
 }
 
-console.log(`\n${checkedDays - failedDays}/${checkedDays} days within tolerance (app minus official, in minutes)`);
+// Every prayer must fall on the day it's calculated for where the place is. Adhan.js alone gives
+// the next day's times where the clock runs a day ahead of the sun (Kiritimati, Apia, Nuku'alofa,
+// Waitangi); prayerTimes() moves the date there. Unlike the timetables, this uses Node's zone data.
+const DAY_CHECKS = [
+  ["Kiritimati", 1.87, -157.43, "Pacific/Kiritimati"],
+  ["Apia", -13.83, -171.76, "Pacific/Apia"],
+  ["Nuku'alofa", -21.14, -175.2, "Pacific/Tongatapu"],
+  ["Waitangi", -43.95, -176.56, "Pacific/Chatham"],
+  ["Auckland", -36.85, 174.76, "Pacific/Auckland"],
+  ["Honolulu", 21.31, -157.86, "Pacific/Honolulu"],
+];
+for (const [city, latitude, longitude, timeZone] of DAY_CHECKS) {
+  const format = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+  const dayOf = (instant) => {
+    const [year, month, day] = format.format(instant).split("-");
+    return new Date(year, month - 1, day, 12); // As the app's locationDay()
+  };
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(2026, 9, 15 + i, 12);
+    const times = prayerTimes(latitude, longitude, date, "MuslimWorldLeague", "Shafi", dayOf);
+    const wrong = PRAYERS.filter((prayer) => dayOf(times[prayer]).getTime() !== date.getTime());
+    checkedDays++;
+    failedDays += wrong.length > 0;
+    console.log(`${wrong.length ? "FAIL" : "ok  "} ${city.padEnd(12)} ${format.format(date)}  ${wrong.length ? `on another day: ${wrong.join(" ")}` : "all prayers on the day"}`);
+  }
+}
+
+console.log(`\n${checkedDays - failedDays}/${checkedDays} days within tolerance (app minus official, in minutes) or on the right day`);
 process.exitCode = failedDays ? 1 : 0;

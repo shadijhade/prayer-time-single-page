@@ -169,9 +169,13 @@
    * @param {string} methodKey - An OFFICIAL_METHODS or adhan.CalculationMethod name, or ISNA
    *   (Adhan's NorthAmerica); unknown keys fall back to DEFAULT_METHOD.
    * @param {string} madhab - "Hanafi" for the later Asr; anything else is Shafi.
+   * @param {Function} [dayOf] - The day an instant falls on where the place is, as a local Date
+   *   like `date`. Adhan.js calculates the solar day whose noon falls on `date` in UTC, which is
+   *   the next day where the clock runs a day ahead of the sun (Samoa, Tonga, Kiribati's Line
+   *   Islands); with dayOf, the date is moved so that Dhuhr falls on `date` there.
    * @returns {object} adhan.PrayerTimes
    */
-  function prayerTimes(latitude, longitude, date, methodKey, madhab) {
+  function prayerTimes(latitude, longitude, date, methodKey, madhab, dayOf) {
     const methods = adhan.CalculationMethod;
     const name = methodKey === "ISNA" ? "NorthAmerica" : methodKey;
     const official = Object.hasOwn(OFFICIAL_METHODS, name) ? OFFICIAL_METHODS[name] : null;
@@ -201,7 +205,11 @@
     if (name === "UmmAlQura" && Number(hijriMonthFormat.format(date)) === 9) {
       params.adjustments.isha = 30;
     }
-    return new adhan.PrayerTimes(coordinates, date, params);
+    const times = new adhan.PrayerTimes(coordinates, date, params);
+    const shiftDays = dayOf ? Math.round((date - dayOf(times.dhuhr)) / 864e5) : 0; // Rounded over DST
+    if (!shiftDays) return times;
+    const solarDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + shiftDays, 12);
+    return new adhan.PrayerTimes(coordinates, solarDate, params);
   }
 
   const prayerRules = { DEFAULT_METHOD, countryDefaults, prayerTimes };
