@@ -83,8 +83,8 @@ jobs:
            # Copy favicons
            cp src/favicon.ico dist/ 2>/dev/null || echo "Info: No favicon.ico found in src/."
            # Note: favicon-96x96.png and apple-touch-icon.png are covered by *.png
-           # Self-hosted fonts and the GeoNames city files; the app needs both, so no fallback
-           cp -r src/fonts src/cities dist/
+           # Self-hosted fonts, the GeoNames city files, iPhone launch screens and install-dialog screenshots; no fallback
+           cp -r src/fonts src/cities src/splash src/screenshots dist/
 
       - name: List dist directory contents (for debugging)
         run: ls -la dist

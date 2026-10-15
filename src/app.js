@@ -14,6 +14,7 @@
   const STORAGE_KEY_LAST_LOCATION = "lastKnownLocation";
   // Older versions cached reverse-geocode lookups under this prefix; they're deleted on start
   const STORAGE_KEY_LOCATION_CACHE_PREFIX = "locationDataCache_";
+  const STORAGE_KEY_INSTALL_DISMISSED = "installBannerDismissed";
 
   // --- Default Values ---
   // Country defaults and the Adhan.js setup live in prayer-rules.js (loaded first)
@@ -34,6 +35,15 @@
   // --- Paths ---
   const SERVICE_WORKER_PATH = "sw.js";
   const CITIES_PATH = "cities/"; // Built from GeoNames by scripts/build-cities.py
+
+  // --- Installed App ---
+  // iPhone screens in device pixels, portrait (iPhone 6s to 17 and Air), with launch screens in
+  // splash/<size>-light.jpg and -dark.jpg; iPads and new sizes get none until added here
+  const IOS_LAUNCH_SCREEN_SIZES = [
+    "750x1334", "828x1792", "1125x2436", "1170x2532", "1179x2556", "1206x2622",
+    "1242x2208", "1242x2688", "1260x2736", "1284x2778", "1290x2796", "1320x2868",
+  ];
+  const SHEET_CLOSE_DRAG_PX = 80; // A sheet dragged down farther than this closes
 
   // --- City Centres ---
   // Times are calculated for the user's city centre, like the timetables mosques publish
@@ -145,6 +155,9 @@
     domRefs.titlebarPrayer = document.getElementById("titlebar-prayer");
     domRefs.titlebarTime = document.getElementById("titlebar-time");
     domRefs.installButton = document.getElementById("install-btn");
+    domRefs.installBanner = document.getElementById("install-banner");
+    domRefs.installDismiss = document.getElementById("install-dismiss");
+    domRefs.iosInstallSheet = document.getElementById("ios-install-sheet");
     domRefs.occasionCountdown = document.getElementById("occasion-countdown");
     domRefs.occasionText = document.getElementById("occasion-text");
     domRefs.pipButton = document.getElementById("pip-btn");
@@ -325,14 +338,11 @@
     if (domRefs.themeToggle) {
       domRefs.themeToggle.checked = theme === "light";
     }
-    // Update browser theme color for mobile address bars etc.
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute(
-        "content",
-        theme === "dark" ? "#0f172a" : "#14b8a6"
-      ); // Example colors
-    }
+    // The status bar and browser toolbar take the header's color (--card-background), so they
+    // read as one surface; both metas, since the toggle can differ from the OS theme they match
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      meta.content = theme === "dark" ? "#1e293b" : "#ffffff";
+    });
   }
 
   /**
@@ -1662,6 +1672,8 @@
 
     // Make the notification visible (use appropriate display style)
     notificationElement.style.display = "block"; // Or 'flex', 'grid', etc.
+    // Same spot at the bottom of the screen; the install banner can wait for another visit
+    if (domRefs.installBanner) domRefs.installBanner.hidden = true;
   }
 
   /** Called when the user clicks the update button. Tells the waiting SW to activate. */
@@ -1900,44 +1912,106 @@
   }
 
   /**
-   * Shows "تثبيت التطبيق" while the app can be installed: the browser's own install prompt where it
-   * offers one (Chromium), or the Add to Home Screen steps on iPhone and iPad, which have no install API.
+   * Offers the app for installing while it can be installed: "تثبيت التطبيق" in the header, and a
+   * banner at the bottom until it's dismissed. They open the browser's own install dialog where it
+   * has one (Chromium: with the screenshots and description from manifest.json), or the Add to
+   * Home Screen steps on iPhone and iPad, which have no install API.
    */
-  function setupInstallButton() {
-    const button = domRefs.installButton;
-    if (!button) return;
+  function setupInstall() {
+    const { installButton: button, installBanner: banner } = domRefs;
+    if (!button || !banner) return;
     let installPrompt = null;
 
+    const offerInstall = (show) => {
+      button.hidden = !show;
+      banner.hidden = !show || localStorage.getItem(STORAGE_KEY_INSTALL_DISMISSED) === "1";
+    };
+
     window.addEventListener("beforeinstallprompt", (event) => {
-      event.preventDefault(); // Our button instead of the browser's mini-infobar
+      event.preventDefault(); // Our banner instead of the browser's mini-infobar
       installPrompt = event;
-      button.hidden = false;
+      offerInstall(true);
     });
-    window.addEventListener("appinstalled", () => {
-      installPrompt = null;
-      button.hidden = true;
-    });
+    window.addEventListener("appinstalled", () => offerInstall(false));
 
     // ponytail: platform sniffing for iOS (iPadOS reports a Mac with touch); drop it once Safari ships an install API
     const isIos =
       /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isIos && !navigator.standalone) button.hidden = false;
+    if (isIos) {
+      addIosLaunchScreens();
+      offerInstall(!matchMedia("(display-mode: standalone)").matches && !navigator.standalone);
+    }
 
-    button.addEventListener("click", async () => {
+    const install = async () => {
       if (!installPrompt) {
-        showToast(
-          "للتثبيت: اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».",
-          "info",
-          8000
-        );
+        domRefs.iosInstallSheet?.showPopover();
         return;
       }
       installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      installPrompt = null; // A prompt can only be shown once
-      if (outcome === "accepted") button.hidden = true;
+      await installPrompt.userChoice;
+      // A prompt can only be shown once; the browser offers a new one on a later visit
+      installPrompt = null;
+      offerInstall(false);
+    };
+    button.addEventListener("click", install);
+    banner.querySelector("[data-install]").addEventListener("click", install);
+    domRefs.installDismiss.addEventListener("click", () => {
+      banner.hidden = true;
+      try {
+        localStorage.setItem(STORAGE_KEY_INSTALL_DISMISSED, "1");
+      } catch (error) {
+        console.error("Failed to save the dismissed install banner:", error);
+      }
     });
+  }
+
+  /**
+   * iPhone launch screen: iOS shows one only from an apple-touch-startup-image link of the screen's
+   * exact size, else a white screen. Added here, for iOS only, instead of a link per model in the page.
+   */
+  function addIosLaunchScreens() {
+    const size = `${screen.width * devicePixelRatio}x${screen.height * devicePixelRatio}`;
+    if (!IOS_LAUNCH_SCREEN_SIZES.includes(size)) return;
+    for (const theme of ["light", "dark"]) {
+      const link = document.createElement("link");
+      link.rel = "apple-touch-startup-image";
+      link.media = `(prefers-color-scheme: ${theme})`;
+      link.href = `splash/${size}-${theme}.jpg`;
+      document.head.append(link);
+    }
+  }
+
+  /**
+   * Phones: a sheet follows a finger dragging its header down and closes when let go far enough,
+   * like a native bottom sheet. The header has touch-action: none there, so the browser doesn't
+   * scroll instead; elsewhere (mouse, wider screens) nothing changes.
+   * @param {HTMLElement} sheet - A popover with a .sheet-header.
+   */
+  function setupSheetSwipe(sheet) {
+    const header = sheet.querySelector(".sheet-header");
+    let startY = null;
+    header.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.target.closest("button")) return;
+      if (!matchMedia("(max-width: 600px)").matches) return; // Bottom sheets only
+      startY = event.clientY;
+      header.setPointerCapture(event.pointerId);
+      sheet.style.transition = "none"; // Follow the finger exactly
+    });
+    header.addEventListener("pointermove", (event) => {
+      if (startY !== null)
+        sheet.style.translate = `0 ${Math.max(0, event.clientY - startY)}px`;
+    });
+    const release = (event) => {
+      if (startY === null) return;
+      const dragged = event.type === "pointerup" ? event.clientY - startY : 0;
+      startY = null;
+      // Back to the stylesheet's transition, which animates from where the finger left it
+      sheet.style.transition = sheet.style.translate = "";
+      if (dragged > SHEET_CLOSE_DRAG_PX) sheet.hidePopover();
+    };
+    header.addEventListener("pointerup", release);
+    header.addEventListener("pointercancel", release);
   }
 
   // ==============================================
@@ -1976,7 +2050,10 @@
     // 4. Initialize Interactive Features
     initializeUiEffects(); // Setup cursor light effect (checks for touch)
     setupCountdownPip(); // Floating countdown where supported
-    setupInstallButton();
+    setupInstall();
+    document.querySelectorAll(".forecast-sheet").forEach(setupSheetSwipe);
+    // iOS Safari applies :active (the pressed state in style.css) only once a touch listener exists
+    document.addEventListener("touchstart", () => {}, { passive: true });
 
     // 5. Register Service Worker (for PWA features/caching/updates)
     registerServiceWorker();

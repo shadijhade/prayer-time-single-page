@@ -184,6 +184,10 @@ html {
   font-size: 100%;
   /* Base for rem units */
   scroll-behavior: smooth;
+  /* No font boost in landscape on iPhone, no grey flash on tap: pressed states give the feedback */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -197,11 +201,43 @@ body {
   flex-direction: column;
   overscroll-behavior-y: contain;
   line-height: 1.5;
+  /* viewport-fit=cover: keep clear of the notch in landscape */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 button,
 select {
   font: inherit;
+}
+
+/* Taps act at once: no double-tap zoom on controls */
+a,
+button,
+input,
+label,
+select {
+  touch-action: manipulation;
+}
+
+/* Pressed state, like native buttons (app.js adds the touch listener iOS needs for :active) */
+:is(.location-button, .forecast-button, .icon-button, .install-banner-button, #update-notification button):active:not(:disabled) {
+  scale: 0.96;
+}
+
+/* Installed app: no text selection or long-press callouts outside the form fields */
+@media (display-mode: standalone),
+(display-mode: window-controls-overlay) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 h1,
@@ -413,6 +449,8 @@ footer {
   border-top: 1px solid var(--border);
   margin-top: auto;
   /* Pushes footer to bottom */
+  margin-bottom: env(safe-area-inset-bottom);
+  /* Above the home indicator / gesture bar */
 }
 
 /* ========================================= */
@@ -621,7 +659,8 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
     align-items: center;
     justify-content: center;
     gap: var(--gap-md);
-    background-color: var(--background);
+    background-color: var(--card-background);
+    /* The header's color, as theme-color gives the window controls beside it */
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
     -webkit-app-region: drag;
@@ -885,6 +924,7 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
   /* Allow clicks through the container */
   width: fit-content;
   max-width: 400px;
+  margin-top: env(safe-area-inset-top);
 }
 
 .toast {
@@ -1060,6 +1100,112 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
   /* Prevent overflow on small screens */
   width: fit-content;
   /* Adjust width to content */
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* --- Install Banner --- */
+/* Room to scroll the last cards out from under it */
+body:has(.install-banner:not([hidden])) {
+  padding-bottom: 5.5rem;
+}
+
+.install-banner {
+  position: fixed;
+  inset-inline: var(--gap-md);
+  bottom: var(--gap-md);
+  margin: 0 auto env(safe-area-inset-bottom);
+  max-width: 30rem;
+  z-index: var(--z-notification);
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding: var(--gap-sm) var(--gap-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--card-background) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: var(--shadow-lg);
+  animation: slide-up 0.5s var(--transition-cubic-bezier) both;
+}
+
+.install-banner p,
+.install-app p {
+  flex: 1;
+  display: grid;
+  line-height: 1.35;
+}
+
+.install-banner span,
+.install-app span {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.install-banner-button {
+  padding: 0.45rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: background-color var(--transition-duration-fast) var(--transition-easing);
+}
+
+.install-banner-button:hover {
+  background-color: var(--primary-hover);
+}
+
+.install-banner-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* --- Add to Home Screen steps (iPhone, iPad) --- */
+.install-app {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding-bottom: var(--gap-lg);
+  margin-bottom: var(--gap-lg);
+  border-bottom: 1px solid var(--border);
+}
+
+.install-steps {
+  list-style: none;
+  display: grid;
+  gap: var(--gap-lg);
+}
+
+.install-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Safari's own glyphs in Safari's blue, so they're easy to spot in its menus */
+.install-steps li>.icon {
+  box-sizing: content-box;
+  padding: 0.45rem;
+  border-radius: 0.65rem;
+  background-color: var(--secondary);
+  color: light-dark(#007aff, #0a84ff);
+}
+
+.install-steps span {
+  display: grid;
+}
+
+.install-steps small {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: normal;
+}
+
+.install-steps small .icon {
+  font-size: 1.4em;
+  vertical-align: middle;
 }
 
 #update-notification button {
@@ -1176,6 +1322,46 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
 
 .city-form .location-button {
   margin-top: var(--gap-md);
+}
+
+/* Phones: sheets rise from the bottom edge like native ones; dragging the header down closes
+   them (app.js), so the browser leaves that gesture to the page (touch-action) */
+@media (max-width: 600px) {
+  .forecast-sheet {
+    width: 100%;
+    max-height: 90dvh;
+    margin: auto 0 0;
+    padding-bottom: calc(var(--card-padding) + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 1.5rem 1.5rem 0 0;
+    translate: 0 100%;
+  }
+
+  @starting-style {
+    .forecast-sheet:popover-open {
+      translate: 0 100%;
+    }
+  }
+
+  .sheet-header {
+    position: relative;
+    margin-top: calc(-1 * var(--card-padding));
+    padding-top: var(--card-padding);
+    touch-action: none;
+  }
+
+  /* Grab handle */
+  .sheet-header::before {
+    content: "";
+    position: absolute;
+    top: var(--gap-sm);
+    inset-inline: 0;
+    width: 2.5rem;
+    height: 0.3rem;
+    margin-inline: auto;
+    border-radius: 999px;
+    background-color: var(--muted);
+  }
 }
 
 footer a {
@@ -1437,6 +1623,13 @@ body.pip {
   from {
     opacity: 0;
     translate: 0 0.75rem;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    translate: 0 150%;
   }
 }
 
