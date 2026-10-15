@@ -35,11 +35,13 @@ jobs:
       # --- Minification Steps (Keep these as you had them) ---
       - name: Minify HTML files (from src to dist)
         run: |
-          # Find the HTML files (index.html) within src
+          # Find the HTML files (index.html) within src.
+          # No --remove-tag-whitespace: it glues attributes together (property="…"content="…"),
+          # which some link-preview scrapers can't read.
           find ./src -maxdepth 1 -name "*.html" -print | while read file; do
             filename=$(basename "$file") # Get just the filename (e.g., index.html)
             output_file="dist/${filename}"
-            npx html-minifier-terser "$file" --collapse-whitespace --remove-comments --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype --minify-css true --minify-js true -o "$output_file"
+            npx html-minifier-terser "$file" --collapse-whitespace --remove-comments --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --use-short-doctype --minify-css true --minify-js true -o "$output_file"
             echo "Minified $file to $output_file"
           done
 
