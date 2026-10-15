@@ -3,7 +3,8 @@ name: Build and Deploy Prayer Times
 on:
   push:
     branches:
-      - main # Trigger only on pushes to the main branch
+      - main # Builds and deploys
+  pull_request: # Builds and runs the accuracy check only; the deploy job is skipped
 
 jobs:
   # --- Build Job (Mostly unchanged, ensure artifact upload is correct) ---
@@ -13,12 +14,12 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       # Fails the build, and so blocks the deploy, if the times drift from the official timetables
@@ -87,7 +88,7 @@ jobs:
 
       # --- Upload Artifact (Crucial for passing files to deploy job) ---
       - name: Upload Minified Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: prayer-times-dist # Consistent artifact name
           path: dist/ # Upload the 'dist' directory content
@@ -99,16 +100,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: build # IMPORTANT: This job runs only after 'build' succeeds
 
-    # IMPORTANT: Only run this deployment step on pushes to the main branch
-    if: github.ref == 'refs/heads/main'
+    # Only pushes to main deploy (pull requests just build and check)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
         contents: read    # Needed for checkout and potentially other steps
         deployments: write  # Crucial: Allows the action to create deployment statuses
-        
+
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: prayer-times-dist # Must match the upload name
           # No path specified = downloads to the root of the workspace
@@ -116,13 +117,18 @@ jobs:
       - name: List downloaded files (for debugging)
         run: ls -la # Check if files are downloaded correctly
 
+      # Wrangler runs on Node; don't depend on the runner image's default version
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      # cloudflare/pages-action was removed from GitHub; Wrangler is Cloudflare's supported way to deploy
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 'prayer-times-pwa' 
-          directory: '.' # Deploy files from the root of the workspace where artifact was downloaded
-          # Optional: Branch is determined by Cloudflare based on the GitHub branch (main = production)
-          # branch: main # Explicitly set for production deployment if needed
+          # The workspace root holds the downloaded build; branch main is the production deployment
+          command: pages deploy . --project-name=prayer-times-pwa --branch=main --commit-hash=${{ github.sha }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }} # Associates deployment with commit
