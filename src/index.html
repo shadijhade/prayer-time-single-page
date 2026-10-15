@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>مواقيت الصلاة - دقيقة ومحدثة لمدينتك</title>
 
     <!-- PWA Manifest & Theme -->
@@ -43,9 +44,10 @@
             rel="stylesheet">
     </noscript>
 
-    <!-- *** ADDED: Material Symbols Font Link (Outlined, Weight 100) *** -->
+    <!-- Material Symbols subset: only the icons used here (icon_names must stay alphabetical).
+         offline.html uses the exact same URL so it is served from the service worker cache. -->
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,-25" />
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,-25&icon_names=calendar_month,check_circle,close,dark_mode,error,info,location_on,moon_stars,my_location,nights_stay,partly_cloudy_day,picture_in_picture_alt,progress_activity,sunny,warning,water_lux,wb_twilight,wifi_off&display=block" />
 
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
@@ -85,16 +87,19 @@
         </div>
         <h1>مواقيت الصلاة</h1>
         <section class="date-container" aria-label="التاريخ الحالي">
-            <div class="day-of-week" id="day-of-week" aria-live="polite" aria-atomic="true" aria-busy="true">--</div>
-            <div class="gregorian-date" id="gregorian-date" aria-live="polite" aria-atomic="true" aria-busy="true">
-                --/--/----</div>
-            <div class="hijri-date" id="hijri-date" aria-live="polite" aria-atomic="true" aria-busy="true">--/--/----
-            </div>
+            <div class="day-of-week" id="day-of-week">--</div>
+            <div class="gregorian-date" id="gregorian-date">--/--/----</div>
+            <div class="hijri-date" id="hijri-date">--/--/----</div>
         </section>
+        <!-- Days until Ramadan / Eid (Temporal, Umm al-Qura calendar); stays hidden without Temporal -->
+        <p class="occasion-countdown" id="occasion-countdown" hidden>
+            <span class="material-symbols-rounded" aria-hidden="true">dark_mode</span>
+            <span id="occasion-text"></span>
+        </p>
         <div class="location-container">
             <span class="material-symbols-rounded location-icon" aria-hidden="true">location_on</span>
-            <span id="location-status">الموقع: <span id="location" aria-live="polite" aria-atomic="true"
-                    aria-busy="true">جاري التحديد...</span></span>
+            <span id="location-status">الموقع: <span id="location" aria-live="polite" aria-atomic="true">جاري
+                    التحديد...</span></span>
         </div>
         <button id="use-location-btn" type="button" class="location-button"
             aria-label="استخدام موقعي الحالي لحساب المواقيت">
@@ -106,16 +111,29 @@
     <main role="main">
         <div id="cursor-light" aria-hidden="true"></div>
 
-        <section class="next-prayer-info" id="next-prayer-info" aria-labelledby="next-prayer-heading" aria-live="polite"
-            aria-relevant="text">
+        <section class="next-prayer-info" id="next-prayer-info" aria-labelledby="next-prayer-heading">
+            <!-- Shown only where Document Picture-in-Picture is supported -->
+            <button id="pip-btn" type="button" class="icon-button pip-button" hidden
+                aria-label="عرض العد التنازلي في نافذة عائمة" title="نافذة عائمة">
+                <span class="material-symbols-rounded" aria-hidden="true">picture_in_picture_alt</span>
+            </button>
             <h2 id="next-prayer-heading">الصلاة القادمة: <span id="next-prayer-name" aria-live="polite"
-                    aria-atomic="true" class="skeleton-text" aria-busy="true">--</span></h2>
+                    aria-atomic="true" class="skeleton-text">--</span></h2>
             <p>سيحين وقت الصلاة بإذن الله بعد:</p>
-            <div class="countdown skeleton-text" id="countdown" aria-atomic="true" aria-live="polite" aria-busy="true">
-                --:--:--</div>
-            <div class="countdown-description skeleton-text" id="countdown-description" aria-live="polite"
-                aria-atomic="true"></div>
+            <!-- role="timer" is not announced every second, unlike a live region -->
+            <div class="countdown skeleton-text" id="countdown" role="timer">--:--:--</div>
+            <div class="countdown-progress" id="countdown-progress" aria-hidden="true"></div>
+            <div class="countdown-description skeleton-text" id="countdown-description"></div>
         </section>
+
+        <!-- Zero-height sticky element: it gets "stuck" once the card above has scrolled away,
+             and a scroll-state container query then slides in this compact countdown -->
+        <div class="sticky-countdown" id="sticky-countdown" aria-hidden="true">
+            <div class="sticky-countdown-pill">
+                <span id="sticky-next-prayer">--</span>
+                <span class="sticky-countdown-time" id="sticky-countdown-time">--:--:--</span>
+            </div>
+        </div>
 
         <section class="prayer-times-section" aria-labelledby="prayer-times-heading">
             <h2 id="prayer-times-heading" class="visually-hidden">أوقات الصلوات لليوم</h2>
@@ -125,109 +143,87 @@
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">nights_stay</span>الفجر</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
 
                 <!-- Sunrise Card -->
                 <div class="prayer-card" data-prayer="sunrise" role="region" aria-label="وقت شروق الشمس">
-                    <!-- ADJUST THIS LINE -->
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">wb_twilight</span>الشروق</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
 
                 <!-- Dhuhr Card -->
                 <div class="prayer-card" data-prayer="dhuhr" role="region" aria-label="وقت صلاة الظهر">
-                    <!-- ADJUST THIS LINE -->
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">sunny</span>الظهر</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
 
                 <!-- Asr Card -->
                 <div class="prayer-card" data-prayer="asr" role="region" aria-label="وقت صلاة العصر">
-                    <!-- ADJUST THIS LINE -->
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">partly_cloudy_day</span>العصر</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
 
                 <!-- Maghrib Card -->
                 <div class="prayer-card" data-prayer="maghrib" role="region" aria-label="وقت صلاة المغرب">
-                    <!-- ADJUST THIS LINE -->
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">water_lux</span>المغرب</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
 
                 <!-- Isha Card -->
                 <div class="prayer-card" data-prayer="isha" role="region" aria-label="وقت صلاة العشاء">
-                    <!-- ADJUST THIS LINE -->
                     <div class="prayer-name"><span class="material-symbols-rounded prayer-icon"
                             aria-hidden="true">moon_stars</span>العشاء</div>
                     <div class="prayer-time skeleton">--:--</div>
-                    <div class="prayer-remaining" aria-live="polite"></div>
                 </div>
             </div>
         </section>
-        <section class="notification-controls" aria-label="التحكم في إشعارات الصلاة">
-            <button id="notify-btn" type="button" class="notify-button" aria-pressed="false" data-state="default">
-                <span class="material-symbols-rounded icon icon-bell-off" aria-hidden="true">notifications_off</span>
-                <span class="material-symbols-rounded icon icon-bell-on" hidden aria-hidden="true">notifications</span>
-                <span class="btn-text">تفعيل الإشعارات</span>
-            </button>
-            <p id="notify-status" class="notification-status-text" aria-live="polite"></p>
-        </section>
-        <!-- Start: Forecast Section -->
-        <section class="forecast-controls" aria-label="التحكم في عرض المواقيت المستقبلية">
-            <button id="show-forecast-btn" type="button" class="forecast-button" aria-controls="forecast-section"
-                aria-expanded="false">
+
+        <!-- Start: Forecast Section (the popover sheet itself is at the end of body) -->
+        <section class="forecast-controls" aria-label="المواقيت المستقبلية">
+            <button id="show-forecast-btn" type="button" class="forecast-button" popovertarget="forecast-sheet"
+                disabled>
                 <span class="material-symbols-rounded icon" aria-hidden="true">calendar_month</span>
                 <span class="btn-text">عرض مواقيت 14 يومًا قادمة</span>
             </button>
         </section>
-
-        <section id="forecast-section" class="prayer-forecast-section" aria-labelledby="forecast-heading" hidden>
-            <h2 id="forecast-heading" class="visually-hidden">مواقيت الصلاة للأيام القادمة</h2>
-            <div id="forecast-table-container" class="forecast-table-container" role="region" aria-live="polite"
-                aria-busy="false">
-                <p class="forecast-placeholder">انقر على الزر أعلاه لعرض المواقيت المستقبلية.</p>
-            </div>
-        </section>
         <!-- End: Forecast Section -->
-        <section class="calculation-method" aria-labelledby="method-heading">
-            <h2 id="method-heading">طريقة الحساب:</h2>
-            <div class="method-selector" role="group" aria-labelledby="method-heading">
-                <!-- Buttons remain the same structure -->
-                <button type="button" class="method-btn" data-method="MuslimWorldLeague" aria-pressed="false">رابطة
-                    العالم الإسلامي</button>
-                <button type="button" class="method-btn" data-method="ISNA" aria-pressed="false">أمريكا الشمالية
-                    (ISNA)</button>
-                <button type="button" class="method-btn" data-method="Egyptian" aria-pressed="false">هيئة المساحة
-                    المصرية</button>
-                <button type="button" class="method-btn" data-method="UmmAlQura" aria-pressed="false">أم القرى،
-                    مكة</button>
-                <button type="button" class="method-btn" data-method="Karachi" aria-pressed="false">جامعة العلوم
-                    الإسلامية، كراتشي</button>
-                <button type="button" class="method-btn" data-method="Tehran" aria-pressed="false">المعهد الجيوفيزيائي،
-                    طهران</button>
-                <button type="button" class="method-btn" data-method="Dubai" aria-pressed="false">دبي</button>
-                <button type="button" class="method-btn" data-method="MoonsightingCommittee" aria-pressed="false">لجنة
-                    رؤية الهلال</button>
-                <button type="button" class="method-btn" data-method="Kuwait" aria-pressed="false">الكويت</button>
-                <button type="button" class="method-btn" data-method="Qatar" aria-pressed="false">قطر</button>
-                <button type="button" class="method-btn" data-method="Singapore" aria-pressed="false">سنغافورة</button>
-            </div>
+
+        <section class="calculation-method" aria-label="طريقة الحساب">
+            <label for="method-select" class="method-label">طريقة الحساب:</label>
+            <select id="method-select" class="method-select">
+                <option value="MuslimWorldLeague">رابطة العالم الإسلامي</option>
+                <option value="ISNA">أمريكا الشمالية (ISNA)</option>
+                <option value="Egyptian">هيئة المساحة المصرية</option>
+                <option value="UmmAlQura">أم القرى، مكة</option>
+                <option value="Karachi">جامعة العلوم الإسلامية، كراتشي</option>
+                <option value="Tehran">المعهد الجيوفيزيائي، طهران</option>
+                <option value="Dubai">دبي</option>
+                <option value="MoonsightingCommittee">لجنة رؤية الهلال</option>
+                <option value="Kuwait">الكويت</option>
+                <option value="Qatar">قطر</option>
+                <option value="Singapore">سنغافورة</option>
+            </select>
         </section>
     </main>
 
     <footer role="contentinfo">
         <p>جميع الحقوق محفوظة © <time id="current-year" datetime=""></time> - شادي جهاد</p>
     </footer>
+
+    <div id="forecast-sheet" class="forecast-sheet" popover role="dialog" aria-labelledby="forecast-heading">
+        <div class="sheet-header">
+            <h2 id="forecast-heading">مواقيت الأيام القادمة</h2>
+            <button type="button" class="icon-button" popovertarget="forecast-sheet" popovertargetaction="hide"
+                aria-label="إغلاق">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            </button>
+        </div>
+        <div id="forecast-table-container" class="forecast-table-container"></div>
+    </div>
 
     <div id="update-notification" role="status" aria-live="assertive">
         <span>يتوفر تحديث جديد للتطبيق.</span>

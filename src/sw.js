@@ -1,7 +1,7 @@
 // sw.js
 // --- Configuration ---
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.0.3.1.2";
-const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.1.1";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.1.0";
+const RUNTIME_CACHE_NAME = "prayer-times-runtime-v1.2.0"; // New name drops the old full icon font
 const OFFLINE_URL = "offline.html";
 
 const APP_SHELL_ASSETS = [

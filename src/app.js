@@ -10,7 +10,6 @@
   const STORAGE_KEY_PRAYER_METHOD = "preferredPrayerMethod";
   const STORAGE_KEY_LAST_LOCATION = "lastKnownLocation";
   const STORAGE_KEY_LOCATION_CACHE_PREFIX = "locationDataCache_";
-  const STORAGE_KEY_NOTIFY_ENABLED = "notificationsEnabled";
 
   // --- Default Values ---
   const DEFAULT_PRAYER_METHOD = "MuslimWorldLeague";
@@ -21,10 +20,7 @@
   const GEOLOCATION_MAX_AGE_MS = 300000; // 5 minutes
   const LOCATION_CACHE_EXPIRY_MS = 360 * 24 * 60 * 60 * 1000; // 360 days
   const REVERSE_GEOCODE_TIMEOUT_MS = 10000; // 10 seconds
-  const PRAYER_TIME_RECALC_DELAY_MS = 1500; // Delay before refreshing after prayer time passes
-  const CALCULATION_RENDER_DELAY_MS = 50; // Small delay to allow skeleton UI render
-  const MOBILE_SCROLL_THROTTLE_MS = 100; // Throttle for mobile scroll effect
-  const MOBILE_PULSE_ANIMATION_DURATION_MS = 400; // Match CSS animation
+  const PRAYER_STARTED_MESSAGE_MS = 60000; // "حان الآن وقت صلاة ..." shows for the first minute
 
   // --- API & Paths ---
   const REVERSE_GEOCODE_URL =
@@ -36,16 +32,16 @@
 
   // --- CSS Classes & Selectors ---
   const CSS_DARK_THEME = "dark-theme";
+  const CSS_LIGHT_THEME = "light-theme";
+  const CSS_THEME_TRANSITION = "theme-vt"; // On <html> while the theme View Transition runs
   const CSS_ACTIVE = "active";
+  const CSS_PASSED = "passed";
   const CSS_SKELETON = "skeleton";
   const CSS_SKELETON_TEXT = "skeleton-text";
   const CSS_TOAST_SHOW = "show";
-  const CSS_MOBILE_DANCING = "is-dancing"; // Class for mobile scroll animation
   // Selectors
-  const SEL_METHOD_BTN = ".method-btn";
   const SEL_PRAYER_CARD = ".prayer-card";
   const SEL_PRAYER_TIME = ".prayer-time";
-  const SEL_PRAYER_REMAINING = ".prayer-remaining";
   const SEL_TOAST_MESSAGE = ".toast-message";
   const SEL_TOAST_CLOSE = ".toast-close";
   const SEL_BTN_TEXT = ".btn-text";
@@ -57,11 +53,6 @@
   const ICON_SUCCESS = `<span class="material-symbols-rounded icon-success" aria-hidden="true">check_circle</span>`;
   const ICON_INFO = `<span class="material-symbols-rounded icon-info" aria-hidden="true">info</span>`;
   const ICON_LOCATION = `<span class="material-symbols-rounded" aria-hidden="true">my_location</span>`;
-
-  // --- Notification Constants ---
-  const NOTIFICATION_ICON_PATH = "web-app-manifest-192x192.png";
-  const PRE_NOTIFICATION_MINUTES = 10;
-  const PRAYER_NOTIFICATION_TAG_PREFIX = "prayer-";
 
   // --- Prayer Data ---
   const PRAYER_NAMES_AR = {
@@ -81,6 +72,14 @@
     "asr",
     "maghrib",
     "isha",
+  ];
+  // One Hijri calendar for the header date and the Ramadan/Eid countdown
+  const HIJRI_CALENDAR = "islamic-umalqura";
+  // Occasions as Hijri (month, day); the greeting replaces the countdown on the day itself
+  const HIJRI_OCCASIONS = [
+    { month: 9, day: 1, name: "رمضان", greeting: "رمضان مبارك" },
+    { month: 10, day: 1, name: "عيد الفطر", greeting: "عيد فطر مبارك" },
+    { month: 12, day: 10, name: "عيد الأضحى", greeting: "عيد أضحى مبارك" },
   ];
   // Maps country codes (ISO 3166-1 alpha-2) to Adhan.js method names
   const COUNTRY_TO_METHOD_MAP = {
@@ -135,14 +134,17 @@
     loadingToastElement: null,
     toastContainerElement: null,
     countdownIntervalId: null,
+    countdownHost: window, // Window whose timer drives the countdown (the PiP window while open)
     currentLocation: null,
     currentPrayerTimes: null,
+    prayerTimeline: null, // [{ key, time, tomorrow? }] from yesterday's Isha to tomorrow's Fajr
+    timelineDay: null, // toDateString() of the day the timeline was calculated on
+    nextPrayer: null, // Timeline entry the countdown currently targets
+    pipWindow: null, // Open Document Picture-in-Picture window, if any
     isMouseEffectEnabled: false,
     mouseEffectRAFId: null,
-    // lastKnownCurrentPrayer: null, // *** REMOVED: No longer needed for highlight logic ***
     isUpdateAvailable: false,
     waitingServiceWorker: null,
-    mobileScrollThrottleTimeout: null, // Timeout ID for scroll throttling
   };
 
   // ==============================================
@@ -162,8 +164,19 @@
     domRefs.prayerTimesContainer = document.getElementById(
       "prayer-times-container"
     );
+    domRefs.nextPrayerInfo = document.getElementById("next-prayer-info");
     domRefs.nextPrayerName = document.getElementById("next-prayer-name");
     domRefs.countdown = document.getElementById("countdown");
+    domRefs.countdownProgress = document.getElementById("countdown-progress");
+    domRefs.stickyCountdown = document.getElementById("sticky-countdown");
+    domRefs.stickyNextPrayer = document.getElementById("sticky-next-prayer");
+    domRefs.stickyCountdownTime = document.getElementById(
+      "sticky-countdown-time"
+    );
+    domRefs.occasionCountdown = document.getElementById("occasion-countdown");
+    domRefs.occasionText = document.getElementById("occasion-text");
+    domRefs.pipButton = document.getElementById("pip-btn");
+    domRefs.methodSelect = document.getElementById("method-select");
     domRefs.countdownDescription = document.getElementById(
       "countdown-description"
     );
@@ -176,78 +189,60 @@
     domRefs.gregorianDate = document.getElementById("gregorian-date");
     domRefs.hijriDate = document.getElementById("hijri-date");
     domRefs.showForecastBtn = document.getElementById("show-forecast-btn");
-    domRefs.forecastSection = document.getElementById("forecast-section");
+    domRefs.forecastSheet = document.getElementById("forecast-sheet");
     domRefs.forecastContainer = document.getElementById(
       "forecast-table-container"
     );
-    domRefs.notifyBtn = document.getElementById("notify-btn");
-    domRefs.notifyStatus = document.getElementById("notify-status");
-    domRefs.iconBellOn = domRefs.notifyBtn?.querySelector(".icon-bell-on");
-    domRefs.iconBellOff = domRefs.notifyBtn?.querySelector(".icon-bell-off");
   }
 
   // ==============================================
   //          Utility Functions
   // ==============================================
+  // Native Arabic plurals ("دقيقتان", "3 دقائق", "11 دقيقة"...); undefined in very old browsers
+  const remainingTimeFormat =
+    Intl.DurationFormat &&
+    new Intl.DurationFormat("ar-u-nu-latn", { style: "long" });
+
   /**
-   * Formats remaining hours and minutes into a descriptive Arabic string.
-   * Ignores seconds for the text output. Omits hours if zero.
-   * @param {number} hours - Remaining hours.
-   * @param {number} minutes - Remaining minutes.
-   * @param {number} seconds - Remaining seconds (used only to determine "less than a minute").
-   * @returns {string} Descriptive text (e.g., "متبقي ساعة و 15 دقيقة", "متبقي 10 دقائق") or an empty string.
+   * Formats the remaining time as descriptive Arabic text, ignoring seconds.
+   * @param {number} totalSeconds - Remaining time in seconds.
+   * @returns {string} e.g. "متبقي ساعة و15 دقيقة", "متبقي أقل من دقيقة", or "" if unsupported.
    */
-  function formatHoursMinutesText(hours, minutes, seconds) {
-    // If time is up or passed
-    if (hours <= 0 && minutes <= 0 && seconds <= 0) {
-      // The main countdown logic usually handles the immediate transition,
-      // but this provides a fallback text if needed briefly.
-      return "حان وقت الصلاة الآن";
-    }
-
-    const hourParts = [];
-    const minuteParts = [];
-
-    // --- Format Hours ---
-    if (hours === 1) {
-      hourParts.push("ساعة");
-    } else if (hours === 2) {
-      hourParts.push("ساعتين");
-    } else if (hours > 2) {
-      // Using digits for clarity with larger numbers
-      hourParts.push(`${hours} ساعات`);
-    }
-    // If hours = 0, hourParts remains empty.
-
-    // --- Format Minutes ---
-    if (minutes === 1) {
-      minuteParts.push("دقيقة"); // Singular minute
-    } else if (minutes === 2) {
-      minuteParts.push("دقيقتان"); // Dual minutes
-    } else if (minutes >= 3 && minutes <= 10) {
-      minuteParts.push(`${minutes} دقائق`); // Plural minutes (3-10)
-    } else if (minutes > 10) {
-      // Using digits for clarity with larger numbers
-      minuteParts.push(`${minutes} دقيقة`); // Singular minute (11+)
-    }
-    // If minutes = 0, minuteParts remains empty.
-
-    // --- Combine ---
-    let combinedText = "";
-    if (hourParts.length > 0 && minuteParts.length > 0) {
-      combinedText = hourParts.join(" ") + " و " + minuteParts.join(" "); // e.g., "ساعة و 5 دقائق"
-    } else if (hourParts.length > 0) {
-      combinedText = hourParts.join(" "); // e.g., "ساعتين"
-    } else if (minuteParts.length > 0) {
-      combinedText = minuteParts.join(" "); // e.g., "15 دقيقة"
-    } else if (hours <= 0 && minutes <= 0 && seconds > 0) {
-      // Only seconds remaining
-      combinedText = "أقل من دقيقة";
-    }
-
-    // Add prefix if there's text to display
-    return combinedText ? "متبقي " + combinedText : "";
+  function formatRemainingText(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const text =
+      hours || minutes
+        ? remainingTimeFormat?.format({ hours, minutes })
+        : "أقل من دقيقة";
+    return text ? "متبقي " + text : "";
   }
+
+  /**
+   * Sets textContent only when it changed, so live regions don't re-announce the same text.
+   * @param {HTMLElement | null} element
+   * @param {string} text
+   */
+  function setTextIfChanged(element, text) {
+    if (element && element.textContent !== text) element.textContent = text;
+  }
+
+  /**
+   * Runs a DOM update inside a View Transition where supported (instantly elsewhere).
+   * A skipped transition (hidden tab, a newer transition) only rejects `ready`; that's expected.
+   * @param {Function} update - The DOM update.
+   * @returns {ViewTransition | undefined}
+   */
+  function withViewTransition(update) {
+    if (!document.startViewTransition) {
+      update();
+      return undefined;
+    }
+    const transition = document.startViewTransition(update);
+    transition.ready.catch(() => {});
+    return transition;
+  }
+
   /**
    * Checks if a value is a valid Date object.
    * @param {*} d - Value to check.
@@ -285,21 +280,6 @@
     }
   }
 
-  /**
-   * Basic HTML escaping. Important for displaying external data (like error messages) safely.
-   * @param {string} unsafe - The potentially unsafe string.
-   * @returns {string} Escaped string.
-   */
-  function escapeHtml(unsafe) {
-    if (typeof unsafe !== "string") return "";
-    return unsafe
-      .replace(/&/g, "&amp;") // Must be first
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
   // ==============================================
   //          Theme Management
   // ==============================================
@@ -324,7 +304,14 @@
    */
   function applyTheme(theme) {
     if (!domRefs.htmlElement) return;
+    // The class sets color-scheme, which flips every light-dark() color in style.css
     domRefs.htmlElement.classList.toggle(CSS_DARK_THEME, theme === "dark");
+    domRefs.htmlElement.classList.toggle(CSS_LIGHT_THEME, theme === "light");
+    // Keep an open PiP countdown window in the same theme
+    if (appState.pipWindow) {
+      appState.pipWindow.document.documentElement.className =
+        domRefs.htmlElement.className;
+    }
     // Update toggle state visually
     if (domRefs.themeToggle) {
       domRefs.themeToggle.checked = theme === "light";
@@ -339,6 +326,26 @@
     }
   }
 
+  /**
+   * Switches the theme inside a View Transition: the new theme is revealed in a circle
+   * growing from the toggle (.theme-vt in style.css). Instant where unsupported.
+   * @param {'light' | 'dark'} theme - The theme to switch to.
+   */
+  function switchThemeWithTransition(theme) {
+    const root = domRefs.htmlElement;
+    if (!document.startViewTransition) {
+      applyTheme(theme);
+      return;
+    }
+    const rect = domRefs.themeToggle.getBoundingClientRect();
+    root.style.setProperty("--vt-x", `${rect.left + rect.width / 2}px`);
+    root.style.setProperty("--vt-y", `${rect.top + rect.height / 2}px`);
+    root.classList.add(CSS_THEME_TRANSITION);
+    withViewTransition(() => applyTheme(theme)).finished.finally(() =>
+      root.classList.remove(CSS_THEME_TRANSITION)
+    );
+  }
+
   /** Sets up the theme toggle functionality. */
   function setupThemeSwitcher() {
     if (!domRefs.themeToggle) return; // Only setup if toggle exists
@@ -347,13 +354,11 @@
 
     domRefs.themeToggle.addEventListener("change", () => {
       const newTheme = domRefs.themeToggle.checked ? "light" : "dark";
-      applyTheme(newTheme);
+      switchThemeWithTransition(newTheme);
       try {
         localStorage.setItem(STORAGE_KEY_THEME, newTheme);
       } catch (e) {
         console.error("Failed to save theme preference:", e);
-        // Optionally show a non-critical toast
-        // showToast("لم نتمكن من حفظ تفضيل المظهر.", 'warning');
       }
     });
   }
@@ -793,8 +798,8 @@
     // --- Final UI Updates & Calculation ---
     if (domRefs.locationSpan)
       domRefs.locationSpan.textContent = locationDisplayText;
-    await selectMethodButton(methodToUse, false); // Update UI button *visually* first
-    await calculateAndDisplayPrayerTimes(latitude, longitude, methodToUse); // Now calculate with the determined method
+    // Select the method in the UI first (falls back to the default for unknown keys), then calculate with it
+    calculateAndDisplayPrayerTimes(latitude, longitude, selectMethod(methodToUse));
   }
 
   /**
@@ -919,418 +924,163 @@
   //          Prayer Times Calculation & Display
   // ==============================================
 
-  /** Sets up initial state and event listeners for method selection buttons. */
-  async function setupMethodButtons() {
-    const methodBtns = document.querySelectorAll(SEL_METHOD_BTN);
-    if (methodBtns.length === 0) {
-      console.warn("No calculation method buttons found.");
+  /** Restores the stored calculation method and recalculates when the user picks another one. */
+  function setupMethodSelect() {
+    if (!domRefs.methodSelect) {
+      console.warn("Calculation method select not found.");
       return;
     }
-
-    methodBtns.forEach((btn) => {
-      btn.setAttribute("aria-pressed", "false"); // A11y: Initial state
-      btn.addEventListener("click", handleMethodButtonClick);
-    });
-
-    // Apply stored/default method visually on load without triggering calculation yet
-    const preferredMethod =
-      localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) || DEFAULT_PRAYER_METHOD;
-    await selectMethodButton(preferredMethod, false); // Select visually only
+    selectMethod(
+      localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) || DEFAULT_PRAYER_METHOD
+    );
+    domRefs.methodSelect.addEventListener("change", handleMethodChange);
   }
 
-  /** Handles clicks on calculation method buttons. */
-  async function handleMethodButtonClick(event) {
-    const button = event.currentTarget; // Use currentTarget for the element listener is attached to
-    const selectedMethodKey = button.getAttribute("data-method");
-    if (!selectedMethodKey) {
-      console.error(
-        "Method button clicked, but 'data-method' attribute is missing."
-      );
-      return;
-    }
-
+  /** Saves the chosen method and recalculates the times if the location is known. */
+  function handleMethodChange() {
+    const methodKey = domRefs.methodSelect.value;
     try {
-      localStorage.setItem(STORAGE_KEY_PRAYER_METHOD, selectedMethodKey);
+      localStorage.setItem(STORAGE_KEY_PRAYER_METHOD, methodKey);
     } catch (e) {
       console.error("Failed to save selected prayer method:", e);
-      // showToast("لم نتمكن من حفظ طريقة الحساب المختارة.", 'warning');
     }
 
     if (appState.currentLocation) {
-      // Location is known, update visually and trigger recalculation
-      resetForecastViewIfOpen();
-      await selectMethodButton(selectedMethodKey, true);
-    } else {
-      // No location yet, just update visually and maybe prompt user
-      await selectMethodButton(selectedMethodKey, false);
-      showToast("يرجى تحديد الموقع أولاً لحساب المواقيت.", "info", 4000);
-      setPrayerTimesSkeletonState(true); // Ensure times are cleared/skeleton if location missing
-      domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // Not busy if no location
-    }
-  }
-
-  /**
-   * Updates the visual state of method buttons and optionally triggers recalculation.
-   * @param {string} methodKey - The key of the method to select (e.g., 'MuslimWorldLeague').
-   * @param {boolean} [triggerCalculation=true] - Whether to recalculate times if location is known.
-   */
-  async function selectMethodButton(methodKey, triggerCalculation = true) {
-    let foundButton = false;
-    let effectiveMethodKey = methodKey; // Use this to track the actually applied method
-    const methodBtns = document.querySelectorAll(SEL_METHOD_BTN); // Query fresh list
-
-    methodBtns.forEach((btn) => {
-      const isButtonForThisMethod =
-        btn.getAttribute("data-method") === methodKey;
-      btn.classList.toggle(CSS_ACTIVE, isButtonForThisMethod);
-      btn.setAttribute(
-        "aria-pressed",
-        isButtonForThisMethod ? "true" : "false"
-      ); // A11y state
-      if (isButtonForThisMethod) foundButton = true;
-    });
-
-    // Fallback if the provided methodKey doesn't match any button
-    if (!foundButton) {
-      console.warn(
-        `Method button for key "${methodKey}" not found. Falling back to ${DEFAULT_PRAYER_METHOD}.`
-      );
-      effectiveMethodKey = DEFAULT_PRAYER_METHOD;
-      // Deactivate all buttons first
-      methodBtns.forEach((btn) => {
-        btn.classList.remove(CSS_ACTIVE);
-        btn.setAttribute("aria-pressed", "false");
-      });
-      // Activate the default button
-      const defaultButton = document.querySelector(
-        `${SEL_METHOD_BTN}[data-method="${DEFAULT_PRAYER_METHOD}"]`
-      );
-      if (defaultButton) {
-        defaultButton.classList.add(CSS_ACTIVE);
-        defaultButton.setAttribute("aria-pressed", "true");
-      } else {
-        console.error(
-          `Default method button "${DEFAULT_PRAYER_METHOD}" also not found! Cannot set active button.`
-        );
-      }
-    }
-
-    // Trigger calculation if requested and location is available
-    if (triggerCalculation && appState.currentLocation) {
-      await calculateAndDisplayPrayerTimes(
+      calculateAndDisplayPrayerTimes(
         appState.currentLocation.latitude,
         appState.currentLocation.longitude,
-        effectiveMethodKey
+        methodKey
       );
-    } else if (triggerCalculation) {
-      // This case should ideally be handled before calling (like in handleMethodButtonClick)
-      console.warn(
-        "Calculation trigger requested, but current location is unknown."
-      );
+    } else {
+      showToast("يرجى تحديد الموقع أولاً لحساب المواقيت.", "info", 4000);
     }
   }
 
   /**
-   * Calculates prayer times using Adhan.js and updates the display.
+   * Selects a method in the dropdown, falling back to the default for unknown keys.
+   * @param {string} methodKey - The key of the method to select (e.g., 'MuslimWorldLeague').
+   * @returns {string} The method that is actually selected.
+   */
+  function selectMethod(methodKey) {
+    const select = domRefs.methodSelect;
+    if (!select) return methodKey || DEFAULT_PRAYER_METHOD;
+    select.value = methodKey;
+    if (select.value !== methodKey) {
+      console.warn(
+        `Method "${methodKey}" not found. Falling back to ${DEFAULT_PRAYER_METHOD}.`
+      );
+      select.value = DEFAULT_PRAYER_METHOD;
+    }
+    return select.value;
+  }
+
+  /**
+   * Calculates prayer times using Adhan.js and starts the countdown, which renders the cards.
    * @param {number} latitude
    * @param {number} longitude
    * @param {string} methodKey - The calculation method key.
    */
-  async function calculateAndDisplayPrayerTimes(
-    latitude,
-    longitude,
-    methodKey
-  ) {
-    if (
-      typeof adhan === "undefined" ||
-      typeof adhan.PrayerTimes === "undefined"
-    ) {
+  function calculateAndDisplayPrayerTimes(latitude, longitude, methodKey) {
+    if (typeof adhan?.PrayerTimes !== "function") {
       handleCalculationError(new Error("Adhan.js library is not loaded."));
       return;
     }
 
-    console.log(
-      `Calculating times for ${latitude.toFixed(4)}, ${longitude.toFixed(
-        4
-      )} using method: ${methodKey}`
-    );
-    setPrayerTimesSkeletonState(true); // Show loading state immediately
-    domRefs.prayerTimesContainer?.setAttribute("aria-busy", "true"); // A11y: busy state
-    stopCountdown(); // Stop previous countdown
+    try {
+      const coordinates = new adhan.Coordinates(latitude, longitude);
+      const params = getAdhanCalculationParameters(methodKey);
+      const today = new Date();
+      const timesForDay = (dayOffset) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() + dayOffset);
+        return new adhan.PrayerTimes(coordinates, date, params);
+      };
 
-    // Defer heavy calculation slightly using setTimeout to allow the browser
-    // to render the skeleton UI update first, improving perceived performance.
-    setTimeout(async () => {
-      try {
-        const coordinates = new adhan.Coordinates(latitude, longitude);
-        const date = new Date(); // Use current date
-        const params = await getAdhanCalculationParameters(methodKey);
-        appState.currentPrayerTimes = new adhan.PrayerTimes(
-          coordinates,
-          date,
-          params
-        );
+      appState.currentPrayerTimes = timesForDay(0);
+      appState.timelineDay = today.toDateString();
+      // Yesterday's Isha and tomorrow's Fajr bracket today, so every moment has a previous and a next prayer
+      appState.prayerTimeline = [
+        { key: "isha", time: timesForDay(-1).isha },
+        ...PRAYER_DISPLAY_ORDER.map((key) => ({
+          key,
+          time: appState.currentPrayerTimes[key],
+        })),
+        { key: "fajr", time: timesForDay(1).fajr, tomorrow: true },
+      ];
+      appState.nextPrayer = null; // Makes the first tick render the cards
 
-        displayPrayerTimes(appState.currentPrayerTimes); // Update UI cards
-        startCountdown(); // Start new countdown for next prayer
-        //showToast("تم تحديث مواقيت الصلاة بنجاح.", "success", 2500);
-        enableLocationButton(); // Re-enable location button after success
-        domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // A11y: no longer busy
-        if (domRefs.showForecastBtn) {
-          domRefs.showForecastBtn.disabled = false;
-        }
-        // Reset forecast if it was open
-        resetForecastViewIfOpen();
-        // ----> Schedule Notifications <----
-        // Check if enabled *before* calling the async schedule function
-        // if (
-        //   localStorage.getItem(STORAGE_KEY_NOTIFY_ENABLED) === "true" &&
-        //   Notification.permission === "granted"
-        // ) {
-        //   await schedulePrayerNotifications(appState.currentPrayerTimes);
-        // } else {
-        //   // If disabled, ensure any previously scheduled (for this session/day) are cleared
-        //   await cancelPrayerNotifications();
-        // }
-        // ----> End Notification Scheduling <----
-      } catch (error) {
-        // Catch errors during Adhan.js calculation or parameter retrieval
-        handleCalculationError(error);
-      }
-    }, CALCULATION_RENDER_DELAY_MS);
+      startCountdown();
+      enableLocationButton(); // Re-enable location button after success
+      if (domRefs.showForecastBtn) domRefs.showForecastBtn.disabled = false;
+    } catch (error) {
+      // Catch errors during Adhan.js calculation
+      handleCalculationError(error);
+    }
   }
 
   /**
    * Handles errors that occur during prayer time calculation.
    * @param {Error} error - The error object.
    */
-  async function handleCalculationError(error) {
+  function handleCalculationError(error) {
     console.error("Error calculating prayer times:", error);
-    // Escape potential HTML in error message before displaying
-    const safeErrorMessage = escapeHtml(
+    // showToast uses textContent, so the message needs no escaping
+    const userMessage = `حدث خطأ أثناء حساب المواقيت. (${
       error.message || "Unknown calculation error"
-    );
-    const userMessage = `حدث خطأ أثناء حساب المواقيت. (${safeErrorMessage})`;
+    })`;
 
     showToast(userMessage, "error", 6000);
     enableLocationButton(true, "خطأ في الحساب"); // Show error on button
-    setPrayerTimesSkeletonState(true); // Ensure skeleton state on error
+    setPrayerTimesSkeletonState(true); // Also stops the countdown and clears the times
     domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false"); // A11y: no longer busy (error state)
-    appState.currentPrayerTimes = null; // Clear invalid/old times data
-    stopCountdown(); // Stop countdown if it was running
-    // --> Cancel notifications on calculation error <--
-    // await cancelPrayerNotifications();
   }
 
   /**
-   * Gets the parameter object required by Adhan.js based on the method key.
-   * Handles fallback to default method if key is invalid or Adhan.js is faulty.
+   * Gets the Adhan.js parameters for a method key, falling back to the default method.
+   * Our keys are adhan.CalculationMethod names, except ISNA (Adhan's NorthAmerica).
    * @param {string} methodKey - The method key (e.g., 'Egyptian').
-   * @returns {object} The Adhan.js parameters object.
+   * @returns {object} The Adhan.js parameters object (Shafi madhab, Adhan's default).
    */
-  async function getAdhanCalculationParameters(methodKey) {
-    // Check if Adhan.js and its core components are loaded
-    if (
-      typeof adhan?.CalculationMethod?.MuslimWorldLeague !== "function" ||
-      typeof adhan?.Madhab?.Shafi !== "string"
-    ) {
-      console.error(
-        "Adhan.js library or essential calculation methods/madhabs not found."
-      );
-      // Return a known safe default to prevent crashes, although calculations will be wrong
-      // Consider throwing an error here instead if Adhan.js is critical
-      return { method: "MuslimWorldLeague", madhab: "shafi" }; // Raw strings as ultimate fallback
-    }
+  function getAdhanCalculationParameters(methodKey) {
+    const methods = adhan.CalculationMethod;
+    const name = methodKey === "ISNA" ? "NorthAmerica" : methodKey;
+    return (
+      Object.hasOwn(methods, name) ? methods[name] : methods[DEFAULT_PRAYER_METHOD]
+    )();
+  }
 
-    const baseParams = { madhab: adhan.Madhab.Shafi }; // Default Madhab for methods that use it
+  /**
+   * Fills the prayer cards and highlights the next prayer inside a View Transition:
+   * changed times cross-fade and the highlight glides to its new card (.active has a view-transition-name).
+   * @param {string} activeKey - Key of the next prayer ('fajr', 'dhuhr', ...).
+   */
+  function renderPrayerCards(activeKey) {
+    const container = domRefs.prayerTimesContainer;
+    if (!container) return;
 
-    // Map our keys to the actual Adhan.js static calculation methods
-    const methodMap = {
-      MuslimWorldLeague: adhan.CalculationMethod.MuslimWorldLeague,
-      Egyptian: adhan.CalculationMethod.Egyptian,
-      Karachi: adhan.CalculationMethod.Karachi,
-      UmmAlQura: adhan.CalculationMethod.UmmAlQura,
-      Dubai: adhan.CalculationMethod.Dubai,
-      MoonsightingCommittee: adhan.CalculationMethod.MoonsightingCommittee, // Likely ISNA/NorthAmerica
-      NorthAmerica: adhan.CalculationMethod.NorthAmerica,
-      ISNA: adhan.CalculationMethod.NorthAmerica, // ISNA is an alias for NorthAmerica in AdhanJS
-      Kuwait: adhan.CalculationMethod.Kuwait,
-      Qatar: adhan.CalculationMethod.Qatar,
-      Singapore: adhan.CalculationMethod.Singapore,
-      Tehran: adhan.CalculationMethod.Tehran,
-      // Add other methods supported by Adhan.js if needed
+    const update = () => {
+      const prayerTimes = appState.currentPrayerTimes;
+      if (!prayerTimes) return;
+      const now = new Date();
+      PRAYER_DISPLAY_ORDER.forEach((prayerKey) => {
+        const card = container.querySelector(
+          `${SEL_PRAYER_CARD}[data-prayer="${prayerKey}"]`
+        );
+        if (!card) return;
+        const prayerTime = prayerTimes[prayerKey];
+        const isActive = prayerKey === activeKey;
+        card.querySelector(SEL_PRAYER_TIME).textContent =
+          formatTimeForDisplay(prayerTime);
+        card.classList.toggle(CSS_ACTIVE, isActive);
+        card.classList.toggle(CSS_PASSED, !isActive && prayerTime < now);
+      });
+      setPrayerTimesSkeletonState(false);
+      container.setAttribute("aria-busy", "false");
     };
 
-    const calculationFunction = methodMap[methodKey];
-    let effectiveMethodKey = methodKey; // Track which method is actually used
-
-    if (calculationFunction && typeof calculationFunction === "function") {
-      try {
-        // Some methods might not accept/require baseParams (check Adhan.js docs if unsure)
-        // Known methods that take no args or specific args: UmmAlQura, Kuwait, Qatar, Tehran
-        if (["UmmAlQura", "Kuwait", "Qatar", "Tehran"].includes(methodKey)) {
-          // Call the function directly if it doesn't take baseParams
-          return calculationFunction();
-        } else {
-          // Call the function with a copy of baseParams (using spread syntax)
-          return calculationFunction({ ...baseParams });
-        }
-      } catch (e) {
-        console.error(
-          `Error invoking Adhan.js parameter function for method ${methodKey}:`,
-          e,
-          `Falling back to ${DEFAULT_PRAYER_METHOD}.`
-        );
-        effectiveMethodKey = DEFAULT_PRAYER_METHOD; // Update effective key
-        // Fallthrough to default case below
-      }
-    }
-
-    // If the methodKey was invalid, or if invoking its function failed, fallback to default
-    if (effectiveMethodKey !== DEFAULT_PRAYER_METHOD) {
-      // Avoid redundant warning if already default
-      console.warn(
-        `Invalid or unsupported method key: "${methodKey}". Falling back to ${DEFAULT_PRAYER_METHOD}.`
-      );
-    }
-    // Update the UI to show the fallback method is active
-    await selectMethodButton(DEFAULT_PRAYER_METHOD, false); // Update UI visually only
-    // Return the default parameters
-    try {
-      return adhan.CalculationMethod.MuslimWorldLeague({ ...baseParams });
-    } catch (e) {
-      console.error(
-        "CRITICAL: Failed to get even the default Adhan.js parameters!",
-        e
-      );
-      // Ultimate fallback if even default fails
-      return { method: "MuslimWorldLeague", madhab: "shafi" };
-    }
+    withViewTransition(update);
   }
 
-  /**
-   * Updates the prayer time cards in the DOM based on calculated times.
-   * @param {adhan.PrayerTimes} prayerTimes - The calculated prayer times object.
-   */
-  function displayPrayerTimes(prayerTimes) {
-    const container = domRefs.prayerTimesContainer;
-    if (!container || !prayerTimes || typeof adhan === "undefined") {
-      console.error(
-        "Cannot display times: Missing container, times object, or Adhan library."
-      );
-      setPrayerTimesSkeletonState(true);
-      domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false");
-      return;
-    }
-
-    // *** CHANGE START: Determine the NEXT prayer to highlight ***
-    let nextPrayerEnum = adhan.Prayer.None;
-    let activePrayerKey = null; // Key of the prayer to make active ('fajr', 'dhuhr', etc.)
-    const now = new Date();
-
-    try {
-      nextPrayerEnum = prayerTimes.nextPrayer(now);
-
-      // If next prayer is None, it means Isha has passed, and the next one is tomorrow's Fajr
-      if (nextPrayerEnum === adhan.Prayer.None) {
-        activePrayerKey = "fajr"; // Highlight Fajr card
-      } else {
-        activePrayerKey = nextPrayerEnum; // Highlight the actual next prayer
-      }
-      console.log(
-        `Next prayer determined as: ${nextPrayerEnum}, Highlighting card: ${activePrayerKey}`
-      );
-    } catch (e) {
-      console.error("Error getting next prayer enum from Adhan.js:", e);
-      activePrayerKey = null; // Don't highlight anything on error
-    }
-    // *** CHANGE END ***
-
-    // --- Update Prayer Cards ---
-    PRAYER_DISPLAY_ORDER.forEach((prayerKey) => {
-      const card = container.querySelector(
-        `${SEL_PRAYER_CARD}[data-prayer="${prayerKey}"]`
-      );
-      if (!card) {
-        console.warn(`Prayer card element not found for: ${prayerKey}`);
-        return;
-      }
-
-      const prayerTimeDate = prayerTimes[prayerKey];
-      const timeEl = card.querySelector(SEL_PRAYER_TIME);
-      const remainingEl = card.querySelector(SEL_PRAYER_REMAINING);
-
-      // Reset card state before applying new state
-      card.classList.remove(CSS_ACTIVE, CSS_SKELETON);
-      if (timeEl) timeEl.classList.remove(CSS_SKELETON);
-      if (remainingEl) remainingEl.textContent = ""; // Always clear remaining text initially for this setup
-
-      if (isValidDate(prayerTimeDate)) {
-        if (timeEl) timeEl.textContent = formatTimeForDisplay(prayerTimeDate);
-
-        // *** CHANGE: Highlight the card if it matches the ACTIVE prayer key ***
-        const isActivePrayer = prayerKey === activePrayerKey;
-        if (isActivePrayer) {
-          card.classList.add(CSS_ACTIVE);
-          // Note: No text is set in remainingEl for the active *upcoming* prayer
-          // The main countdown shows the time remaining.
-        }
-        // *** CHANGE END ***
-      } else {
-        // Handle invalid/missing time
-        if (timeEl) {
-          timeEl.textContent = "--:--";
-          timeEl.classList.add(CSS_SKELETON);
-        }
-        if (remainingEl) remainingEl.textContent = "";
-        console.warn(`Invalid or missing time for prayer: ${prayerKey}`);
-      }
-    });
-
-    // --- Update Next Prayer Info Section (uses nextPrayerEnum directly) ---
-    updateNextPrayerDisplay(prayerTimes, nextPrayerEnum, now);
-
-    // Mark overall display as loaded
-    setPrayerTimesSkeletonState(false);
-    domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false");
-  }
-  /**
-   * Updates the display area showing the name of the next prayer.
-   * @param {adhan.PrayerTimes} prayerTimes - The current prayer times object (needed for tomorrow's Fajr).
-   * @param {adhan.Prayer} nextPrayerEnum - The enum value for the next prayer.
-   * @param {Date} now - The current date/time.
-   */
-  function updateNextPrayerDisplay(prayerTimes, nextPrayerEnum, now) {
-    const nextPrayerEl = domRefs.nextPrayerName;
-    if (!nextPrayerEl || typeof adhan === "undefined") return;
-
-    let nextPrayerText = "خطأ";
-
-    try {
-      if (nextPrayerEnum === adhan.Prayer.None) {
-        const tomorrowFajrTime = getTomorrowFajrTime(
-          prayerTimes.coordinates,
-          prayerTimes.calculationParameters
-        );
-        if (tomorrowFajrTime) {
-          nextPrayerText = PRAYER_NAMES_AR.fajr + " (غداً)";
-        } else {
-          nextPrayerText = "خطأ في حساب الفجر";
-        }
-      } else {
-        nextPrayerText = PRAYER_NAMES_AR[nextPrayerEnum] || nextPrayerEnum;
-      }
-      nextPrayerEl.textContent = nextPrayerText;
-      nextPrayerEl.classList.remove(CSS_SKELETON_TEXT);
-    } catch (e) {
-      console.error(
-        "Error determining or setting next prayer name display:",
-        e
-      );
-      nextPrayerEl.textContent = "خطأ";
-      nextPrayerEl.classList.add(CSS_SKELETON_TEXT);
-    }
-  }
   /**
    * Formats a date for display in the forecast table (e.g., "السبت، ١٥ يونيو").
    * @param {Date} date - The date object to format.
@@ -1353,291 +1103,84 @@
       return date.toLocaleDateString("en-CA");
     }
   }
-  /**
-   * Helper to calculate tomorrow's Fajr time.
-   * @param {adhan.Coordinates} coordinates - Location coordinates.
-   * @param {object} params - Calculation parameters.
-   * @returns {Date | null} Date object for tomorrow's Fajr or null on error.
-   */
-  function getTomorrowFajrTime(coordinates, params) {
-    if (typeof adhan?.PrayerTimes !== "function" || !coordinates || !params) {
-      console.error(
-        "Cannot calculate tomorrow's Fajr: Adhan library, coordinates, or params missing."
-      );
-      return null;
-    }
-    try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      // Setting time to 00:00:00 is implicit when creating PrayerTimes for a specific date
-      const tomorrowPrayerTimes = new adhan.PrayerTimes(
-        coordinates,
-        tomorrow,
-        params
-      );
-      return tomorrowPrayerTimes.fajr; // Return the Date object for Fajr
-    } catch (e) {
-      console.error("Could not calculate tomorrow's Fajr time:", e);
-      return null;
-    }
-  }
-
   /** Stops the countdown interval timer. */
   function stopCountdown() {
     if (appState.countdownIntervalId) {
-      clearInterval(appState.countdownIntervalId);
+      appState.countdownHost.clearInterval(appState.countdownIntervalId);
       appState.countdownIntervalId = null;
-      console.log("Countdown stopped.");
     }
-    // Optional: Immediately reset countdown display to placeholder when stopped explicitly
-    // updateCountdownDisplay(-1); // Show placeholder/error state like '--:--:--'
   }
 
-  /** Starts the countdown timer to the next prayer. */
+  /**
+   * Starts the per-second countdown to the next prayer. While the PiP window is open its timer
+   * drives the ticks, because the main tab may be hidden and hidden tabs get their timers throttled.
+   */
   function startCountdown() {
     stopCountdown();
-
-    if (!domRefs.countdown || !domRefs.nextPrayerName) {
-      console.error(
-        "Cannot start countdown: Required DOM elements are missing."
-      );
-      return;
-    }
-    if (
-      !appState.currentPrayerTimes ||
-      !appState.currentPrayerTimes.coordinates ||
-      !appState.currentPrayerTimes.calculationParameters
-    ) {
-      console.error("Cannot start countdown: Prayer times data is missing.");
-      updateCountdownDisplay(-1);
-      return;
-    }
-
-    // *** REMOVED: Caching prayerCardsMap as it's no longer used in updateCountdownTick for highlighting ***
-
-    function updateCountdownTick() {
-      if (!appState.currentPrayerTimes || typeof adhan === "undefined") {
-        handleCountdownError("Prayer times data or Adhan library unavailable.");
-        return;
-      }
-
-      const now = new Date();
-      let nextPrayerEnum = adhan.Prayer.None;
-      let nextPrayerTime = null;
-      let timeDifferenceMillis = -1;
-      let isNextPrayerTomorrow = false;
-
-      try {
-        if (
-          !appState.currentPrayerTimes.coordinates ||
-          !appState.currentPrayerTimes.calculationParameters
-        ) {
-          throw new Error("Missing coordinates or parameters.");
-        }
-
-        nextPrayerEnum = appState.currentPrayerTimes.nextPrayer(now);
-
-        if (nextPrayerEnum === adhan.Prayer.None) {
-          nextPrayerTime = getTomorrowFajrTime(
-            appState.currentPrayerTimes.coordinates,
-            appState.currentPrayerTimes.calculationParameters
-          );
-          if (!nextPrayerTime) {
-            throw new Error("Failed to calculate tomorrow's Fajr time.");
-          }
-          isNextPrayerTomorrow = true;
-        } else {
-          nextPrayerTime =
-            appState.currentPrayerTimes.timeForPrayer(nextPrayerEnum);
-          if (!isValidDate(nextPrayerTime)) {
-            throw new Error(`Invalid Date for next prayer: ${nextPrayerEnum}`);
-          }
-        }
-
-        timeDifferenceMillis = nextPrayerTime.getTime() - now.getTime();
-      } catch (e) {
-        handleCountdownError(`Error calculating time: ${e.message}`);
-        return;
-      }
-
-      if (timeDifferenceMillis <= 0) {
-        if (domRefs.countdownDescription) {
-          domRefs.countdownDescription.textContent = "حان وقت الصلاة الآن";
-          domRefs.countdownDescription.classList.remove(CSS_SKELETON_TEXT);
-        }
-        handleNextPrayerTimeReached();
-        return;
-      }
-
-      // --- Update UI Elements ---
-      updateCountdownDisplay(timeDifferenceMillis / 1000);
-      if (domRefs.countdownDescription) {
-        const totalSeconds = Math.floor(timeDifferenceMillis / 1000);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = Math.floor(totalSeconds % 60);
-        const descriptionText = formatHoursMinutesText(hours, minutes, seconds);
-        domRefs.countdownDescription.textContent = descriptionText;
-        domRefs.countdownDescription.classList.remove(CSS_SKELETON_TEXT);
-      }
-
-      const expectedNextPrayerName = isNextPrayerTomorrow
-        ? PRAYER_NAMES_AR.fajr + " (غداً)"
-        : PRAYER_NAMES_AR[nextPrayerEnum] || nextPrayerEnum;
-
-      if (
-        domRefs.nextPrayerName &&
-        domRefs.nextPrayerName.textContent !== expectedNextPrayerName
-      ) {
-        domRefs.nextPrayerName.textContent = expectedNextPrayerName;
-        domRefs.nextPrayerName.classList.remove(CSS_SKELETON_TEXT);
-        console.log("Next prayer name updated to:", expectedNextPrayerName);
-      }
-
-      // *** REMOVED: Call to updateActiveCardHighlight as highlighting is handled by displayPrayerTimes ***
-    } // --- End of updateCountdownTick function ---
-
+    if (!appState.prayerTimeline) return;
+    appState.countdownHost = appState.pipWindow || window;
     updateCountdownTick();
-    appState.countdownIntervalId = setInterval(updateCountdownTick, 1000);
-    console.log("Countdown started.");
-  }
-
-  /**
-   * Handles errors occurring within the countdown interval.
-   * @param {string} errorMessage - A description of the error.
-   */
-  function handleCountdownError(errorMessage) {
-    console.error("Countdown error:", errorMessage);
-    stopCountdown(); // Stop the faulty interval
-    updateCountdownDisplay(-1); // Show error state (e.g., --:--:--)
-    if (domRefs.nextPrayerName) {
-      domRefs.nextPrayerName.textContent = "خطأ";
-      domRefs.nextPrayerName.classList.add(CSS_SKELETON_TEXT);
-    }
-    if (domRefs.countdownDescription) {
-      domRefs.countdownDescription.textContent = "";
-      domRefs.countdownDescription.classList.add(CSS_SKELETON_TEXT);
-    }
-    // Consider showing a toast, but be mindful of spamming if the error persists every second
-    // showToast("خطأ في تحديث الوقت المتبقي.", 'error', 5000);
-  }
-
-  /**
-   * Called when the countdown reaches zero or less. Stops the current
-   * countdown and triggers a recalculation/refresh of prayer times.
-   */
-  async function handleNextPrayerTimeReached() {
-    console.log(
-      "Next prayer time reached or passed. Updating display and triggering refresh..."
+    appState.countdownIntervalId = appState.countdownHost.setInterval(
+      updateCountdownTick,
+      1000
     );
-    stopCountdown(); // Stop the current interval immediately
-    updateCountdownDisplay(0); // Briefly show 00:00:00
-
-    // Schedule a refresh after a short delay to allow time for propagation
-    // and to avoid potential race conditions.
-    setTimeout(async () => {
-      // Double-check if a refresh is still needed and possible
-      // (e.g., user hasn't navigated away, location data still exists)
-      if (
-        document.getElementById(
-          "countdown"
-        ) /* Check if element still exists */ &&
-        appState.currentLocation
-      ) {
-        console.log(
-          "Refreshing prayer times automatically after time reached."
-        );
-        // Get the *currently selected* method from the UI or storage
-        const activeMethodBtn = document.querySelector(
-          `${SEL_METHOD_BTN}.${CSS_ACTIVE}`
-        );
-        const currentMethodKey =
-          activeMethodBtn?.getAttribute("data-method") ||
-          localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) ||
-          DEFAULT_PRAYER_METHOD;
-
-        // Trigger a full recalculation and display update
-        await calculateAndDisplayPrayerTimes(
-          appState.currentLocation.latitude,
-          appState.currentLocation.longitude,
-          currentMethodKey
-        );
-      } else if (!appState.currentLocation) {
-        // If location was lost somehow, we can't auto-refresh
-        console.warn(
-          "Cannot refresh prayer times automatically: Location data is missing."
-        );
-        showToast(
-          "لا يمكن تحديث المواقيت تلقائياً (الموقع غير معروف).",
-          "warning",
-          5000
-        );
-        setPrayerTimesSkeletonState(true); // Reset to skeleton if location is lost
-        domRefs.prayerTimesContainer?.setAttribute("aria-busy", "false");
-      } else {
-        console.log("Automatic refresh skipped (e.g., UI elements removed).");
-      }
-    }, PRAYER_TIME_RECALC_DELAY_MS); // Use constant for delay
   }
 
-  /**
-   * Optimizes updating the active prayer card highlight within the countdown.
-   * Only changes classes if the current prayer actually changes.
-   * @param {Date} now - The current time.
-   * @param {Map<string, HTMLElement>} prayerCardsMap - Map of prayer keys to card elements.
-   */
-  function updateActiveCardHighlight(now, prayerCardsMap) {
-    // Defensive checks
-    if (!appState.currentPrayerTimes || typeof adhan === "undefined") return;
+  /** Updates countdown, progress bar and texts; re-renders the cards when the next prayer changes. */
+  function updateCountdownTick() {
+    const now = new Date();
+    const location = appState.currentLocation;
 
-    let currentPrayerEnum = adhan.Prayer.None;
-    try {
-      // Determine the *actual* current prayer based on the exact time 'now'
-      currentPrayerEnum = appState.currentPrayerTimes.currentPrayer(now);
-    } catch (e) {
-      console.warn(
-        "Could not determine current prayer in countdown update:",
-        e
+    // Page left open past midnight: refresh the dates and calculate the new day
+    if (location && now.toDateString() !== appState.timelineDay) {
+      updateDates();
+      calculateAndDisplayPrayerTimes(
+        location.latitude,
+        location.longitude,
+        domRefs.methodSelect?.value || DEFAULT_PRAYER_METHOD
       );
-      // Use the last known good value as a fallback, or None
-      currentPrayerEnum = appState.lastKnownCurrentPrayer || adhan.Prayer.None;
+      return;
     }
 
-    // Compare with the last known current prayer. Only update DOM if it changed.
-    // This is the core optimization for this function.
-    if (currentPrayerEnum !== appState.lastKnownCurrentPrayer) {
-      console.log(
-        `Current prayer changed: ${appState.lastKnownCurrentPrayer} -> ${currentPrayerEnum}`
-      );
+    const timeline = appState.prayerTimeline;
+    if (!timeline) return;
+    const nextIndex = timeline.findIndex((prayer) => prayer.time > now);
+    const next = timeline[nextIndex];
+    const previous = timeline[nextIndex - 1];
+    if (!next) return;
 
-      // Deactivate the previously active card
-      const previousCard = prayerCardsMap.get(appState.lastKnownCurrentPrayer);
-      if (previousCard) {
-        previousCard.classList.remove(CSS_ACTIVE);
-        const remainingEl = previousCard.querySelector(SEL_PRAYER_REMAINING);
-        if (remainingEl) remainingEl.textContent = ""; // Clear "now" text
-      }
+    const remainingMs = next.time - now;
+    updateCountdownDisplay(remainingMs / 1000);
+    const progress = previous
+      ? ((now - previous.time) / (next.time - previous.time)).toFixed(4)
+      : 0;
+    // The card's bar and the sticky pill's line both read --progress
+    domRefs.countdownProgress?.style.setProperty("--progress", progress);
+    domRefs.stickyCountdown?.style.setProperty("--progress", progress);
 
-      // Activate the new current prayer card
-      const currentCard = prayerCardsMap.get(currentPrayerEnum);
-      if (currentCard) {
-        currentCard.classList.add(CSS_ACTIVE);
-        const remainingEl = currentCard.querySelector(SEL_PRAYER_REMAINING);
-        if (remainingEl) {
-          // Set text indicating the prayer is current
-          remainingEl.textContent = "حان وقت الصلاة الآن";
-        }
-      } else if (currentPrayerEnum !== adhan.Prayer.None) {
-        // Log if we expect a card but didn't find it (e.g., data-prayer mismatch)
-        console.warn(
-          `Card element not found in map for newly current prayer: ${currentPrayerEnum}`
-        );
-      }
+    const justStarted =
+      previous &&
+      previous.key !== "sunrise" &&
+      now - previous.time < PRAYER_STARTED_MESSAGE_MS;
+    setTextIfChanged(
+      domRefs.countdownDescription,
+      justStarted
+        ? `حان الآن وقت صلاة ${PRAYER_NAMES_AR[previous.key]}`
+        : formatRemainingText(remainingMs / 1000)
+    );
+    const nextName =
+      PRAYER_NAMES_AR[next.key] + (next.tomorrow ? " (غداً)" : "");
+    setTextIfChanged(domRefs.nextPrayerName, nextName);
+    setTextIfChanged(domRefs.stickyNextPrayer, nextName);
+    setTextIfChanged(
+      domRefs.stickyCountdownTime,
+      domRefs.countdown?.textContent ?? ""
+    );
 
-      // Update the state tracking the last known current prayer
-      appState.lastKnownCurrentPrayer = currentPrayerEnum;
+    if (next !== appState.nextPrayer) {
+      appState.nextPrayer = next;
+      renderPrayerCards(next.key);
     }
-    // If currentPrayerEnum === appState.lastKnownCurrentPrayer, do nothing.
   }
 
   /**
@@ -1646,8 +1189,7 @@
    */
   function updateCountdownDisplay(totalSeconds) {
     const el = domRefs.countdown;
-    // **Accessibility:** Add aria-live="polite" aria-atomic="true" to the HTML #countdown element
-    // <span id="countdown" aria-live="polite" aria-atomic="true">--:--:--</span>
+    // **Accessibility:** #countdown is role="timer", not a live region, so it isn't read out every second
     if (!el) return;
 
     if (isNaN(totalSeconds) || totalSeconds < 0) {
@@ -1690,15 +1232,10 @@
       if (showSkeleton) el.textContent = "--:--"; // Set placeholder text
     });
 
-    // Toggle skeleton on the cards themselves (optional, for background/layout)
+    // Toggle skeleton on the cards themselves; skeleton cards are neither next nor passed
     container.querySelectorAll(SEL_PRAYER_CARD).forEach((card) => {
       card.classList.toggle(CSS_SKELETON, showSkeleton);
-      if (showSkeleton) {
-        // Ensure card is not marked active and clear remaining text during skeleton state
-        card.classList.remove(CSS_ACTIVE);
-        const remainingEl = card.querySelector(SEL_PRAYER_REMAINING);
-        if (remainingEl) remainingEl.textContent = "";
-      }
+      if (showSkeleton) card.classList.remove(CSS_ACTIVE, CSS_PASSED);
     });
 
     // Toggle skeleton for next prayer name and countdown displays
@@ -1722,6 +1259,9 @@
     if (showSkeleton) {
       stopCountdown();
       appState.currentPrayerTimes = null;
+      appState.prayerTimeline = null;
+      domRefs.countdownProgress?.style.removeProperty("--progress");
+      if (domRefs.showForecastBtn) domRefs.showForecastBtn.disabled = true; // Re-enabled after the next calculation
       // Note: aria-busy is set/unset in the calling functions (setUILoadingState, calculateAndDisplayPrayerTimes etc.)
       // to correctly reflect the *reason* for the skeleton state (loading vs error).
     }
@@ -1777,13 +1317,8 @@
       window.matchMedia("(pointer:coarse)").matches;
 
     if (hasTouch) {
-      console.log("Touch input detected, setting up mobile scroll effect.");
+      // Touch devices: a CSS scroll-driven animation moves the glow (style.css), no JS needed
       appState.isMouseEffectEnabled = false; // Desktop effect is off
-      setupMobileScrollEffect(lightElement, mainArea); // Call mobile setup
-      // --- Ensure desktop-specific styles applied by JS are removed ---
-      lightElement.style.opacity = ""; // Let CSS handle opacity
-      lightElement.style.transform = ""; // Let CSS handle transform
-      // No need to hide the element, CSS media query handles visibility/positioning
     } else {
       console.log("Pointer device detected, initializing cursor light effect.");
       appState.isMouseEffectEnabled = true; // Desktop effect is on
@@ -1864,46 +1399,6 @@
 
     // Initial reset for cards
     mainArea.querySelectorAll(SEL_PRAYER_CARD).forEach(resetCardGlow);
-  }
-
-  /** Sets up the background glow effect that reacts to scroll on mobile. */
-  function setupMobileScrollEffect(lightElement, mainArea) {
-    // Throttle function remains the same
-    function throttle(callback, delay) {
-      if (appState.mobileScrollThrottleTimeout) return;
-      appState.mobileScrollThrottleTimeout = setTimeout(() => {
-        callback();
-        appState.mobileScrollThrottleTimeout = null;
-      }, delay);
-    }
-
-    // *** CHANGE START: Modified scroll handler ***
-    function handleScroll() {
-      // Remove the class briefly to allow re-triggering animation
-      lightElement.classList.remove(CSS_MOBILE_DANCING);
-
-      // Force browser reflow/repaint - reading offsetWidth is a common trick
-      // This ensures the class removal is processed before adding it back.
-      void lightElement.offsetWidth;
-
-      // Add the class back to trigger the CSS animation (defined in style.css)
-      lightElement.classList.add(CSS_MOBILE_DANCING);
-
-      // No timeout needed here - CSS animation handles the duration
-    }
-    // *** CHANGE END ***
-
-    // Add MOBILE scroll listener with throttling
-    window.addEventListener(
-      "scroll",
-      () => {
-        throttle(handleScroll, MOBILE_SCROLL_THROTTLE_MS); // Use constant for throttle delay
-      },
-      { passive: true }
-    );
-
-    // No need to set initial styles here, CSS media query handles it
-    console.log("Mobile scroll effect listener attached (Pulse Animation).");
   }
 
   /**
@@ -2021,11 +1516,11 @@
     if (domRefs.hijriDate) {
       try {
         // Use 'ar-SA' (Saudi Arabia) as it often has good Islamic calendar support.
-        // '-u-ca-islamic' specifies the Islamic calendar system.
-        // '-umalqura' is optional, for the Umm al-Qura variant if supported/needed.
+        // '-u-ca-islamic-umalqura' is the Umm al-Qura calendar, the same one the
+        // Ramadan/Eid countdown uses, so both always agree.
         // Example format: ٢٢ ذو القعدة ١٤٤٤ هـ
         domRefs.hijriDate.textContent = new Intl.DateTimeFormat(
-          "ar-SA-u-ca-islamic",
+          `ar-SA-u-ca-${HIJRI_CALENDAR}`,
           { day: "numeric", month: "long", year: "numeric" }
         ).format(now);
       } catch (e) {
@@ -2036,7 +1531,7 @@
         try {
           // Fallback to generic 'ar' locale with Islamic calendar
           domRefs.hijriDate.textContent = new Intl.DateTimeFormat(
-            "ar-u-ca-islamic",
+            `ar-u-ca-${HIJRI_CALENDAR}`,
             { day: "numeric", month: "long", year: "numeric" }
           ).format(now);
         } catch (e2) {
@@ -2054,283 +1549,43 @@
       // Only set once if empty
       domRefs.currentYear.textContent = now.getFullYear().toString();
     }
-  }
-  // ==============================================
-  //          Push Notification Handling
-  // ==============================================
 
-  /** Checks if Notifications are supported */
-  function notificationsSupported() {
-    return (
-      "Notification" in window &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window
-    );
-  }
-
-  /** Updates the Notification Button UI based on permission and enabled state */
-  function updateNotificationButtonUI() {
-    if (!domRefs.notifyBtn) return;
-
-    const permission = Notification.permission;
-    const isEnabled =
-      localStorage.getItem(STORAGE_KEY_NOTIFY_ENABLED) === "true";
-    const textSpan = domRefs.notifyBtn.querySelector(".btn-text");
-
-    // Reset icons first
-    if (domRefs.iconBellOn) domRefs.iconBellOn.hidden = true;
-    if (domRefs.iconBellOff) domRefs.iconBellOff.hidden = true;
-
-    if (permission === "denied") {
-      domRefs.notifyBtn.disabled = true;
-      domRefs.notifyBtn.setAttribute("aria-pressed", "false");
-      domRefs.notifyBtn.dataset.state = "denied";
-      if (textSpan) textSpan.textContent = "تم رفض الإشعارات";
-      if (domRefs.iconBellOff) domRefs.iconBellOff.hidden = false; // Show bell off
-      if (domRefs.notifyStatus)
-        domRefs.notifyStatus.textContent = "تم حظر الإشعارات من قبل المتصفح.";
-    } else if (permission === "granted") {
-      domRefs.notifyBtn.disabled = false;
-      domRefs.notifyBtn.dataset.state = isEnabled ? "enabled" : "disabled";
-      domRefs.notifyBtn.setAttribute(
-        "aria-pressed",
-        isEnabled ? "true" : "false"
-      );
-      if (textSpan)
-        textSpan.textContent = isEnabled
-          ? "تعطيل الإشعارات"
-          : "تفعيل الإشعارات";
-      if (isEnabled && domRefs.iconBellOn) domRefs.iconBellOn.hidden = false; // Show bell on if enabled
-      if (!isEnabled && domRefs.iconBellOff) domRefs.iconBellOff.hidden = false; // Show bell off if disabled
-      if (domRefs.notifyStatus)
-        domRefs.notifyStatus.textContent = isEnabled ? "الإشعارات مفعلة." : "";
-    } else {
-      // default
-      domRefs.notifyBtn.disabled = false;
-      domRefs.notifyBtn.setAttribute("aria-pressed", "false");
-      domRefs.notifyBtn.dataset.state = "default";
-      if (textSpan) textSpan.textContent = "تفعيل الإشعارات";
-      if (domRefs.iconBellOff) domRefs.iconBellOff.hidden = false; // Show bell off
-      if (domRefs.notifyStatus)
-        domRefs.notifyStatus.textContent = "انقر لتفعيل إشعارات مواقيت الصلاة.";
-    }
-  }
-
-  /** Handles click on the notification toggle button */
-  async function handleNotificationToggle() {
-    if (!notificationsSupported() || !domRefs.notifyBtn) {
-      showToast("الإشعارات غير مدعومة في هذا المتصفح.", "warning");
-      if (domRefs.notifyBtn) domRefs.notifyBtn.disabled = true;
-      return;
-    }
-
-    const currentState =
-      domRefs.notifyBtn.getAttribute("aria-pressed") === "true";
-    const currentPermission = Notification.permission;
-
-    // --- Disable Flow ---
-    if (currentState) {
-      console.log("Disabling notifications.");
-      localStorage.removeItem(STORAGE_KEY_NOTIFY_ENABLED);
-      updateNotificationButtonUI();
-      await cancelPrayerNotifications(); // Attempt to cancel scheduled
-      showToast("تم تعطيل إشعارات الصلاة.", "info");
-      return;
-    }
-
-    // --- Enable Flow ---
-    domRefs.notifyBtn.disabled = true; // Disable while processing
-    const textSpan = domRefs.notifyBtn.querySelector(".btn-text");
-    if (textSpan) textSpan.textContent = "جاري المعالجة...";
-
-    let permissionResult = currentPermission;
-
-    // 1. Request Permission if needed
-    if (permissionResult === "default") {
-      try {
-        permissionResult = await Notification.requestPermission();
-      } catch (error) {
-        console.error("Error requesting notification permission:", error);
-        showToast("حدث خطأ أثناء طلب إذن الإشعارات.", "error");
-        permissionResult = "denied"; // Assume denied on error
-      }
-    }
-
-    // 2. Handle Permission Result
-    if (permissionResult === "granted") {
-      localStorage.setItem(STORAGE_KEY_NOTIFY_ENABLED, "true");
-      updateNotificationButtonUI();
-      showToast("تم تفعيل الإشعارات بنجاح!", "success");
-      // Schedule notifications for current times if available
-      if (appState.currentPrayerTimes) {
-        await schedulePrayerNotifications(appState.currentPrayerTimes);
-      } else {
-        showToast("سيتم جدولة الإشعارات عند حساب المواقيت.", "info");
-      }
-    } else {
-      // denied or dismissed (treated as denied)
-      localStorage.removeItem(STORAGE_KEY_NOTIFY_ENABLED); // Ensure disabled
-      updateNotificationButtonUI(); // Will show denied state
-      if (permissionResult === "denied") {
-        showToast(
-          "تم رفض إذن الإشعارات. يرجى تمكينه من إعدادات المتصفح.",
-          "warning",
-          6000
-        );
-      }
-      // No else needed for 'default' if user dismissed prompt, button resets
-    }
-
-    // Re-enable button (unless denied)
-    if (permissionResult !== "denied") {
-      domRefs.notifyBtn.disabled = false;
-    }
+    updateOccasionCountdown();
   }
 
   /**
-   * Schedules notifications for the given prayer times object.
-   * @param {adhan.PrayerTimes} prayerTimes - Calculated prayer times for the day.
+   * Shows the days left until the next Ramadan / Eid, using Temporal's Hijri calendar arithmetic.
+   * Stays hidden where Temporal isn't available.
    */
-  async function schedulePrayerNotifications(prayerTimes) {
-    if (
-      !notificationsSupported() ||
-      Notification.permission !== "granted" ||
-      !prayerTimes
-    ) {
-      console.log(
-        "Skipping notification scheduling (not supported, permission denied, or no times)."
-      );
-      return;
-    }
-    // Ensure notifications are marked as enabled in storage
-    if (localStorage.getItem(STORAGE_KEY_NOTIFY_ENABLED) !== "true") {
-      console.log(
-        "Skipping scheduling: Notifications are globally disabled by user preference."
-      );
-      return;
-    }
+  function updateOccasionCountdown() {
+    const el = domRefs.occasionCountdown;
+    if (!el || typeof Temporal === "undefined" || !remainingTimeFormat) return;
 
-    console.log("Attempting to schedule notifications...");
-
+    // Optional extra: it must never break initialization (updateDates runs during init)
     try {
-      const registration = await navigator.serviceWorker.ready; // Get active SW registration
-      const now = new Date();
-
-      // --- Cancel potentially conflicting old notifications first ---
-      // Getting notifications and closing them might be unreliable for *scheduled* ones.
-      // Relying on the TAG to replace is safer. We'll log any existing ones.
-      const existingNotifications = await registration.getNotifications({
-        includeTriggered: true,
-      }); // Try to include scheduled
-      let cancelledCount = 0;
-      existingNotifications.forEach((notif) => {
-        if (notif.tag && notif.tag.startsWith(PRAYER_NOTIFICATION_TAG_PREFIX)) {
-          notif.close(); // Close active/triggered ones with our tag
-          cancelledCount++;
-        }
-      });
-      if (cancelledCount > 0)
-        console.log(
-          `[Notifications] Closed ${cancelledCount} existing prayer notifications.`
-        );
-
-      // --- Schedule new notifications ---
-      let scheduledCount = 0;
-      for (const prayerKey of PRAYER_DISPLAY_ORDER) {
-        // Use display order
-        const prayerTime = prayerTimes[prayerKey]; // e.g., prayerTimes.fajr
-        if (!isValidDate(prayerTime)) continue; // Skip invalid times
-
-        // --- Schedule Pre-Notification (10 mins before) ---
-        const prePrayerTime = new Date(
-          prayerTime.getTime() - PRE_NOTIFICATION_MINUTES * 60 * 1000
-        );
-        const prePrayerTag = `${PRAYER_NOTIFICATION_TAG_PREFIX}${prayerKey}-pre`;
-
-        if (prePrayerTime > now) {
-          const prePrayerTitle = `صلاة ${
-            PRAYER_NAMES_AR[prayerKey] || prayerKey
-          }`;
-          const prePrayerBody = `سيحين وقت الأذان بعد ${PRE_NOTIFICATION_MINUTES} دقائق بإذن الله.`;
-
-          await registration.showNotification(prePrayerTitle, {
-            body: prePrayerBody,
-            icon: NOTIFICATION_ICON_PATH,
-            tag: prePrayerTag, // Unique tag allows replacement/closing
-            timestamp: prePrayerTime.getTime(), // Schedule for the future
-            // renotify: false, // Prevent re-notification if tag exists? (Might interfere with updates)
-            silent: false, // Ensure it makes sound/vibrates unless user settings override
+      const today = Temporal.Now.plainDateISO().withCalendar(HIJRI_CALENDAR);
+      for (const year of [today.year, today.year + 1]) {
+        for (const occasion of HIJRI_OCCASIONS) {
+          const date = Temporal.PlainDate.from({
+            calendar: HIJRI_CALENDAR,
+            year,
+            month: occasion.month,
+            day: occasion.day,
           });
-          scheduledCount++;
-          // console.log(`Scheduled PRE-notification for ${prayerKey} at ${prePrayerTime.toLocaleTimeString()}`);
+          const days = today.until(date).days;
+          if (days < 0) continue; // Already passed this year
+
+          domRefs.occasionText.textContent =
+            days === 0
+              ? occasion.greeting
+              : `متبقي ${remainingTimeFormat.format({ days })} على ${occasion.name}`;
+          el.hidden = false;
+          return;
         }
-
-        // --- Schedule Exact Time Notification ---
-        const exactPrayerTime = prayerTime;
-        const exactPrayerTag = `${PRAYER_NOTIFICATION_TAG_PREFIX}${prayerKey}-exact`;
-
-        if (exactPrayerTime > now) {
-          const exactPrayerTitle = `حان الآن وقت صلاة ${
-            PRAYER_NAMES_AR[prayerKey] || prayerKey
-          }`;
-          const exactPrayerBody = `تقبل الله منا ومنكم صالح الأعمال.`; // Example body
-
-          await registration.showNotification(exactPrayerTitle, {
-            body: exactPrayerBody,
-            icon: NOTIFICATION_ICON_PATH,
-            tag: exactPrayerTag,
-            timestamp: exactPrayerTime.getTime(),
-            // renotify: false,
-            silent: false,
-          });
-          scheduledCount++;
-          // console.log(`Scheduled EXACT notification for ${prayerKey} at ${exactPrayerTime.toLocaleTimeString()}`);
-        }
-      } // end for loop
-
-      if (scheduledCount > 0) {
-        console.log(
-          `[Notifications] Successfully scheduled ${scheduledCount} notifications for today.`
-        );
-        // Optional: showToast(`تم جدولة ${scheduledCount} إشعارًا للصلاة.`, 'info', 2000);
-      } else {
-        console.log(
-          "[Notifications] No future prayer times found for today to schedule notifications."
-        );
       }
-    } catch (error) {
-      console.error("Error scheduling notifications:", error);
-      showToast("حدث خطأ أثناء جدولة إشعارات الصلاة.", "error");
-    }
-  }
-
-  /** Attempts to cancel scheduled prayer notifications by closing active ones with specific tags. */
-  async function cancelPrayerNotifications() {
-    if (!notificationsSupported()) return;
-
-    console.log("Attempting to cancel prayer notifications...");
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const notifications = await registration.getNotifications({
-        includeTriggered: true,
-      }); // Get potentially active/scheduled
-      let cancelledCount = 0;
-      notifications.forEach((notification) => {
-        if (
-          notification.tag &&
-          notification.tag.startsWith(PRAYER_NOTIFICATION_TAG_PREFIX)
-        ) {
-          notification.close();
-          cancelledCount++;
-        }
-      });
-      console.log(
-        `[Notifications] Closed ${cancelledCount} notifications with tag prefix '${PRAYER_NOTIFICATION_TAG_PREFIX}'.`
-      );
-      // Note: This might not cancel notifications scheduled with `timestamp` that haven't fired yet.
-      // The most reliable way to "cancel" is to stop scheduling new ones and let existing ones expire or be replaced.
-    } catch (error) {
-      console.error("Error cancelling notifications:", error);
+    } catch (e) {
+      // e.g. a Temporal build without Hijri calendars: the chip stays hidden
+      console.warn("Ramadan/Eid countdown unavailable:", e);
     }
   }
   // ==============================================
@@ -2458,202 +1713,104 @@
   //          Prayer Times Forecast
   // ==============================================
 
-  /** Handles the click event for the forecast toggle button. */
-  function handleForecastToggle() {
-    if (
-      !domRefs.showForecastBtn ||
-      !domRefs.forecastSection ||
-      !domRefs.forecastContainer
-    )
-      return;
-
-    const isExpanded =
-      domRefs.showForecastBtn.getAttribute("aria-expanded") === "true";
-
-    if (isExpanded) {
-      // Collapse the forecast section
-      domRefs.forecastSection.hidden = true;
-      domRefs.showForecastBtn.setAttribute("aria-expanded", "false");
-      domRefs.forecastContainer.innerHTML = `<p class="forecast-placeholder">انقر على الزر أعلاه لعرض المواقيت المستقبلية.</p>`; // Reset content
-      domRefs.forecastContainer.setAttribute("aria-busy", "false");
-      const btnTextSpan = domRefs.showForecastBtn.querySelector(".btn-text");
-      if (btnTextSpan) btnTextSpan.textContent = "عرض مواقيت 14 يومًا قادمة";
-    } else {
-      // Expand the forecast section
-      if (!appState.currentLocation) {
-        showToast(
-          "يرجى تحديد الموقع أولاً لعرض المواقيت المستقبلية.",
-          "warning",
-          4000
-        );
-        domRefs.showForecastBtn.disabled = true; // Disable button if no location
-        setTimeout(() => {
-          // Re-enable after a delay
-          if (domRefs.showForecastBtn) domRefs.showForecastBtn.disabled = false;
-        }, 3000);
-        return;
-      }
-
-      domRefs.forecastSection.hidden = false;
-      domRefs.showForecastBtn.setAttribute("aria-expanded", "true");
-      domRefs.forecastContainer.setAttribute("aria-busy", "true");
-      domRefs.forecastContainer.innerHTML = `<p class="forecast-loading">جارِ تحميل المواقيت المستقبلية...</p>`; // Show loading state
-
-      const btnTextSpan = domRefs.showForecastBtn.querySelector(".btn-text");
-      if (btnTextSpan) btnTextSpan.textContent = "إخفاء المواقيت المستقبلية";
-
-      // Generate and display the forecast asynchronously
-      generateAndDisplayForecast().catch((error) => {
-        console.error("Error generating forecast:", error);
-        domRefs.forecastContainer.innerHTML = `<p class="forecast-error">حدث خطأ أثناء تحميل المواقيت المستقبلية. حاول مرة أخرى.</p>`;
-        domRefs.forecastContainer.setAttribute("aria-busy", "false");
-        // Optionally reset button state here too
-      });
-    }
-  }
-
-  /** Generates prayer times for the next 14 days and renders the table. */
-  async function generateAndDisplayForecast() {
-    if (!appState.currentLocation || typeof adhan === "undefined") {
-      throw new Error("Location or Adhan library not available for forecast.");
-    }
-
-    console.log("Generating 14-day forecast...");
-    const { latitude, longitude } = appState.currentLocation;
-    const currentMethodKey =
-      localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) || DEFAULT_PRAYER_METHOD;
-    const params = await getAdhanCalculationParameters(currentMethodKey); // Reuse existing function
-    const coordinates = new adhan.Coordinates(latitude, longitude);
-
-    const forecastData = [];
-    const today = new Date(); // Start from today
-
-    for (let i = 0; i < 14; i++) {
-      // Loop 14 times (0 to 13 for today + next 13 days)
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + i);
-      targetDate.setHours(12, 0, 0, 0); // Set to midday to avoid DST issues across midnight
-
-      try {
-        const prayerTimes = new adhan.PrayerTimes(
-          coordinates,
-          targetDate,
-          params
-        );
-        const formattedDay = {
-          date: formatForecastDate(targetDate), // Use the new helper
-          fajr: formatTimeForDisplay(prayerTimes.fajr),
-          sunrise: formatTimeForDisplay(prayerTimes.sunrise),
-          dhuhr: formatTimeForDisplay(prayerTimes.dhuhr),
-          asr: formatTimeForDisplay(prayerTimes.asr),
-          maghrib: formatTimeForDisplay(prayerTimes.maghrib),
-          isha: formatTimeForDisplay(prayerTimes.isha),
-        };
-        forecastData.push(formattedDay);
-      } catch (error) {
-        console.error(
-          `Error calculating times for date ${targetDate
-            .toISOString()
-            .slice(0, 10)}:`,
-          error
-        );
-        // Add a placeholder row for the errored day
-        forecastData.push({
-          date: formatForecastDate(targetDate) + " (خطأ)",
-          fajr: "--:--",
-          sunrise: "--:--",
-          dhuhr: "--:--",
-          asr: "--:--",
-          maghrib: "--:--",
-          isha: "--:--",
-        });
-      }
-    }
-
-    renderForecastTable(forecastData);
-    domRefs.forecastContainer.setAttribute("aria-busy", "false");
-    console.log("Forecast displayed.");
-  }
-
   /**
-   * Renders the forecast data into an HTML table.
-   * @param {Array<object>} forecastData - Array of objects, each representing a day's times.
+   * Builds the 14-day table each time the forecast popover opens,
+   * so it always matches the current location, method and date.
    */
-  function renderForecastTable(forecastData) {
-    if (!domRefs.forecastContainer) return;
+  function renderForecast() {
+    if (!appState.currentLocation || !domRefs.forecastContainer) return;
 
-    if (!forecastData || forecastData.length === 0) {
-      domRefs.forecastContainer.innerHTML = `<p class="forecast-placeholder">لم يتم العثور على بيانات للمواقيت المستقبلية.</p>`;
-      return;
-    }
+    const { latitude, longitude } = appState.currentLocation;
+    const coordinates = new adhan.Coordinates(latitude, longitude);
+    const params = getAdhanCalculationParameters(domRefs.methodSelect?.value);
+    const headerCells = PRAYER_DISPLAY_ORDER.map(
+      (key) => `<th scope="col">${PRAYER_NAMES_AR[key]}</th>`
+    ).join("");
 
-    // Build table header
-    const tableHeader = `
-      <thead>
-          <tr>
-              <th>التاريخ</th>
-              <th>الفجر</th>
-              <th>الشروق</th>
-              <th>الظهر</th>
-              <th>العصر</th>
-              <th>المغرب</th>
-              <th>العشاء</th>
-          </tr>
-      </thead>
-  `;
-
-    // Build table body rows
-    const tableBodyRows = forecastData
-      .map(
-        (day) => `
-      <tr>
-          <td>${escapeHtml(day.date)}</td>
-          <td>${escapeHtml(day.fajr)}</td>
-          <td>${escapeHtml(day.sunrise)}</td>
-          <td>${escapeHtml(day.dhuhr)}</td>
-          <td>${escapeHtml(day.asr)}</td>
-          <td>${escapeHtml(day.maghrib)}</td>
-          <td>${escapeHtml(day.isha)}</td>
-      </tr>
-  `
-      )
-      .join(""); // Join array of row strings into one big string
-
-    // Combine and inject into container
-    domRefs.forecastContainer.innerHTML = `
-    <div class="table-warpper">
-      <table class="forecast-table">
-          ${tableHeader}
-          <tbody>
-              ${tableBodyRows}
-          </tbody>
-      </table>
-    </div>
-  `;
-  }
-
-  /** Resets the forecast section if it's open */
-  function resetForecastViewIfOpen() {
-    if (
-      domRefs.showForecastBtn &&
-      domRefs.forecastSection &&
-      !domRefs.forecastSection.hidden
-    ) {
-      console.log("Resetting forecast view due to change.");
-      // Collapse the section and reset the button
-      domRefs.forecastSection.hidden = true;
-      domRefs.showForecastBtn.setAttribute("aria-expanded", "false");
-      domRefs.forecastContainer.innerHTML = `<p class="forecast-placeholder">تم تغيير الموقع أو طريقة الحساب. انقر على الزر أعلاه لتحديث المواقيت المستقبلية.</p>`;
-      domRefs.forecastContainer.setAttribute("aria-busy", "false");
-      const btnTextSpan = domRefs.showForecastBtn.querySelector(".btn-text");
-      if (btnTextSpan) btnTextSpan.textContent = "عرض مواقيت 14 يومًا قادمة";
-      showToast(
-        "تم إخفاء المواقيت المستقبلية. أعد فتحها للتحديث.",
-        "info",
-        3500
+    const rows = [];
+    for (let i = 0; i < 14; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() + i);
+      date.setHours(12, 0, 0, 0); // Midday avoids DST issues around midnight
+      const times = new adhan.PrayerTimes(coordinates, date, params);
+      // data-label / data-day feed the phone carousel (CSS labels and dot names)
+      const cells = PRAYER_DISPLAY_ORDER.map(
+        (key) =>
+          `<td data-label="${PRAYER_NAMES_AR[key]}">${formatTimeForDisplay(times[key])}</td>`
+      ).join("");
+      const day = formatForecastDate(date);
+      rows.push(
+        `<tr data-day="${day}"><th scope="row">${day}</th>${cells}</tr>`
       );
     }
+
+    // Only Intl-formatted dates/times and our own constants go into this markup
+    domRefs.forecastContainer.innerHTML = `
+      <table class="forecast-table">
+        <thead><tr><th scope="col">التاريخ</th>${headerCells}</tr></thead>
+        <tbody>${rows.join("")}</tbody>
+      </table>`;
   }
+
+  // ==============================================
+  //          Floating Countdown (Document Picture-in-Picture)
+  // ==============================================
+
+  /** Shows the PiP button where the Document Picture-in-Picture API exists (Chromium desktop). */
+  function setupCountdownPip() {
+    if (!domRefs.pipButton || !("documentPictureInPicture" in window)) return;
+    domRefs.pipButton.hidden = false;
+    domRefs.pipButton.addEventListener("click", openCountdownPip);
+  }
+
+  /** Moves the next-prayer card into an always-on-top window; it moves back when that window closes. */
+  async function openCountdownPip() {
+    if (appState.pipWindow || !domRefs.nextPrayerInfo) return;
+    const card = domRefs.nextPrayerInfo;
+    let pipWindow;
+    try {
+      pipWindow = await documentPictureInPicture.requestWindow({
+        width: 360,
+        height: 260,
+      });
+    } catch (error) {
+      // e.g. embedded browsers that expose the API but can't open the window
+      console.error("Could not open the Picture-in-Picture window:", error);
+      showToast("تعذر فتح النافذة العائمة.", "error");
+      return;
+    }
+
+    // Same stylesheets (absolute URLs: the PiP document is about:blank) and theme
+    document.head
+      .querySelectorAll('link[rel="stylesheet"], style')
+      .forEach((node) => {
+        const copy = node.cloneNode(true);
+        if (node.href) copy.href = node.href;
+        pipWindow.document.head.append(copy);
+      });
+    const pipRoot = pipWindow.document.documentElement;
+    pipRoot.className = domRefs.htmlElement.className;
+    pipRoot.lang = "ar";
+    pipRoot.dir = "rtl";
+    pipWindow.document.body.classList.add("pip");
+
+    const placeholder = document.createComment("next-prayer-info");
+    card.before(placeholder);
+    pipWindow.document.body.append(card);
+    appState.pipWindow = pipWindow;
+    startCountdown(); // Tick from the PiP window from now on
+
+    pipWindow.addEventListener(
+      "pagehide",
+      () => {
+        placeholder.replaceWith(card);
+        appState.pipWindow = null;
+        startCountdown();
+      },
+      { once: true }
+    );
+  }
+
   // ==============================================
   //          Initialization
   // ==============================================
@@ -2685,38 +1842,22 @@
 
     // 3. Setup User Controls & Load Preferences
     setupThemeSwitcher(); // Load theme pref and set up toggle
-    await setupMethodButtons(); // Load method pref and set up buttons visually
+    setupMethodSelect(); // Load method pref and set up the dropdown
 
     // 4. Initialize Interactive Features
     initializeUiEffects(); // Setup cursor light effect (checks for touch)
+    setupCountdownPip(); // Floating countdown where supported
 
     // 5. Register Service Worker (for PWA features/caching/updates)
     registerServiceWorker();
 
-    // // Setup Notification Button Listener & Initial State
-    // if (notificationsSupported() && domRefs.notifyBtn) {
-    //   // domRefs.notifyBtn.addEventListener("click", handleNotificationToggle);
-    //   updateNotificationButtonUI(); // Set initial button state based on permission/storage
-    // } else if (domRefs.notifyBtn) {
-    //   domRefs.notifyBtn.disabled = true; // Disable if not supported
-    //   const textSpan = domRefs.notifyBtn.querySelector(".btn-text");
-    //   if (textSpan) textSpan.textContent = "الإشعارات غير مدعومة";
-    //   if (domRefs.notifyStatus)
-    //     domRefs.notifyStatus.textContent = "متصفحك لا يدعم الإشعارات.";
-    // }
-
     // 6. Setup Core Event Listeners
     domRefs.locationButton.addEventListener("click", handleLocationButtonClick);
-    // Add listener for the forecast button
-    if (domRefs.showForecastBtn) {
-      domRefs.showForecastBtn.addEventListener("click", handleForecastToggle);
-      // Initially disable forecast button if no location is loaded from storage
-      if (!appState.currentLocation) {
-        domRefs.showForecastBtn.disabled = true;
-      }
-    } else {
-      console.warn("Forecast toggle button not found.");
-    }
+    // The forecast popover opens/closes declaratively (popovertarget); just fill it on open.
+    // Its button stays disabled until times are calculated.
+    domRefs.forecastSheet?.addEventListener("beforetoggle", (event) => {
+      if (event.newState === "open") renderForecast();
+    });
     // 7. Set Initial Loading/UI State (Always start skeleton)
     setPrayerTimesSkeletonState(true);
     domRefs.prayerTimesContainer.setAttribute("aria-busy", "true");
@@ -2749,9 +1890,11 @@
           const displayText =
             storedLocationData.displayText ||
             `موقع سابق: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`; // Fallback text
-          const methodKey =
+          // Update the dropdown (falls back to the default for unknown keys)
+          const methodKey = selectMethod(
             localStorage.getItem(STORAGE_KEY_PRAYER_METHOD) ||
-            DEFAULT_PRAYER_METHOD;
+              DEFAULT_PRAYER_METHOD
+          );
 
           // Update app state
           appState.currentLocation = { latitude, longitude, source: "storage" };
@@ -2760,12 +1903,9 @@
           if (domRefs.locationSpan) {
             domRefs.locationSpan.textContent = displayText;
           }
-          await selectMethodButton(methodKey, false); // Update button visually
 
-          // Calculate and display times
-          showToast("جارِ تحميل المواقيت للموقع المحفوظ...", "info", 2000); // Inform user
-          // No need to await here, let it run. UI is already in skeleton state.
-          await calculateAndDisplayPrayerTimes(latitude, longitude, methodKey);
+          // Calculate and display times (synchronous and instant, no loading toast needed)
+          calculateAndDisplayPrayerTimes(latitude, longitude, methodKey);
 
           loadedFromStorage = true; // Mark as loaded
         } else {
@@ -2773,7 +1913,6 @@
           localStorage.removeItem(STORAGE_KEY_LAST_LOCATION);
         }
       } else {
-        updateNotificationButtonUI();
         console.log("No last known location found in storage.");
       }
     } catch (error) {
