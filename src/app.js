@@ -22,6 +22,8 @@
   // --- Timing & Duration ---
   const TOAST_TRANSITION_DURATION_MS = 350; // Match CSS transition
   const PRAYER_STARTED_MESSAGE_MS = 60000; // "حان الآن وقت صلاة ..." shows for the first minute
+  const CALENDAR_DAYS = 30; // Days of prayers in the calendar file
+  const CALENDAR_EVENT_MS = 15 * 60000; // Length of each prayer's calendar event
   // A coarse (Wi-Fi/cell) position arrives quickly and is plenty to find the city
   const GEOLOCATION_OPTIONS = {
     enableHighAccuracy: false,
@@ -160,6 +162,7 @@
     domRefs.gregorianDate = document.getElementById("gregorian-date");
     domRefs.hijriDate = document.getElementById("hijri-date");
     domRefs.showForecastBtn = document.getElementById("show-forecast-btn");
+    domRefs.calendarBtn = document.getElementById("calendar-btn");
     domRefs.forecastSheet = document.getElementById("forecast-sheet");
     domRefs.forecastContainer = document.getElementById(
       "forecast-table-container"
@@ -991,6 +994,7 @@
       startCountdown();
       enableLocationButton(); // Re-enable location button after success
       if (domRefs.showForecastBtn) domRefs.showForecastBtn.disabled = false;
+      if (domRefs.calendarBtn) domRefs.calendarBtn.disabled = false;
     } catch (error) {
       // Catch errors during Adhan.js calculation
       handleCalculationError(error);
@@ -1228,6 +1232,7 @@
       appState.prayerTimeline = null;
       domRefs.countdownProgress?.style.removeProperty("--progress");
       if (domRefs.showForecastBtn) domRefs.showForecastBtn.disabled = true; // Re-enabled after the next calculation
+      if (domRefs.calendarBtn) domRefs.calendarBtn.disabled = true;
       // Note: aria-busy is set/unset in the calling functions (setUILoadingState, calculateAndDisplayPrayerTimes etc.)
       // to correctly reflect the *reason* for the skeleton state (loading vs error).
     }
@@ -1722,6 +1727,85 @@
   }
 
   // ==============================================
+  //          Calendar Export (.ics)
+  // ==============================================
+
+  const utf8 = new TextEncoder();
+  /** An instant as an RFC 5545 UTC date-time, e.g. "20261015T021300Z". */
+  const icsTime = (date) => date.toISOString().replace(/[-:]|\.\d+/g, "");
+
+  /**
+   * Folds a content line into lines of at most 75 octets (RFC 5545 3.1), never inside a character.
+   * @param {string} line
+   * @returns {string}
+   */
+  function foldIcsLine(line) {
+    let folded = "";
+    let octets = 0;
+    for (const char of line) {
+      const size = utf8.encode(char).length;
+      if (octets + size > 75) {
+        folded += "\r\n "; // A continuation line starts with a space, which counts too
+        octets = 1;
+      }
+      folded += char;
+      octets += size;
+    }
+    return folded;
+  }
+
+  /**
+   * Downloads the five prayers of the next CALENDAR_DAYS days as an .ics file, each with a reminder
+   * at its time, so the phone's own calendar reminds the user: no server or push service needed.
+   */
+  function downloadCalendar() {
+    const location = appState.currentLocation;
+    if (!location) return;
+    const now = new Date();
+    const methodKey = domRefs.methodSelect?.value;
+    const madhab = domRefs.madhabSelect?.value;
+    // TEXT values escape \ ; and , (RFC 5545 3.3.11); place names have no line breaks
+    const place = location.displayText.replace(/[\\;,]/g, "\\$&");
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//prayer-times//ar"];
+    for (let i = 0; i < CALENDAR_DAYS; i++) {
+      const day = locationDay(now, i);
+      const dayId = day.getFullYear() * 10000 + (day.getMonth() + 1) * 100 + day.getDate();
+      const times = prayerRules.prayerTimes(location.latitude, location.longitude, day, methodKey, madhab);
+      for (const key of PRAYER_DISPLAY_ORDER) {
+        const time = times[key];
+        // Sunrise isn't a prayer; passed times would show overdue reminders in some calendars, and
+        // polar-night times are invalid dates (never > now)
+        if (key === "sunrise" || !(time > now)) continue;
+        const name = `صلاة ${PRAYER_NAMES_AR[key]}`;
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:${dayId}-${key}@prayer-times`, // Stable: importing again updates the events, not duplicates them
+          `DTSTAMP:${icsTime(now)}`,
+          `DTSTART:${icsTime(time)}`,
+          `DTEND:${icsTime(new Date(time.getTime() + CALENDAR_EVENT_MS))}`,
+          `SUMMARY:${name}`,
+          `DESCRIPTION:مواقيت الصلاة في ${place}`,
+          "BEGIN:VALARM",
+          "ACTION:DISPLAY",
+          "TRIGGER:PT0S",
+          `DESCRIPTION:حان الآن وقت ${name}`,
+          "END:VALARM",
+          "END:VEVENT"
+        );
+      }
+    }
+    lines.push("END:VCALENDAR");
+
+    const ics = lines.map(foldIcsLine).join("\r\n") + "\r\n";
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    link.download = "prayer-times.ics";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 60000); // Late enough for slow downloads
+    showToast("تم تنزيل ملف التقويم. افتحه لإضافة المواقيت إلى تقويمك.", "success");
+  }
+
+  // ==============================================
   //          Floating Countdown (Document Picture-in-Picture)
   // ==============================================
 
@@ -1896,6 +1980,7 @@
     domRefs.forecastSheet?.addEventListener("beforetoggle", (event) => {
       if (event.newState === "open") renderForecast();
     });
+    domRefs.calendarBtn?.addEventListener("click", downloadCalendar);
     // The city picker popover is filled on first open
     domRefs.citySheet?.addEventListener("beforetoggle", handleCityPickerToggle);
     domRefs.countrySelect?.addEventListener("change", () =>

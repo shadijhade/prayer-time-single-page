@@ -1083,9 +1083,11 @@ main:not(:has(#countdown:not(.skeleton-text))) .sticky-countdown {
 /* ========================================= */
 
 .forecast-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gap-sm);
   margin-top: var(--gap-2xl);
-  text-align: center;
-  /* Center the button */
 }
 
 .forecast-button {
