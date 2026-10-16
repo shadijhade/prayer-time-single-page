@@ -11,7 +11,7 @@ const path = require("path");
 
 const SRC = path.join(__dirname, "..", "src");
 globalThis.adhan = require(path.join(SRC, "adhan.umd.js"));
-const { countryDefaults, prayerTimes, sunAltitude, declinationAt } = require(path.join(SRC, "prayer-rules.js"));
+const { countryDefaults, prayerTimes, sunAltitude, declinationAt, dayIn, calendarIcs } = require(path.join(SRC, "prayer-rules.js"));
 
 const PRAYERS = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 
@@ -513,5 +513,28 @@ for (const [city, latitude, longitude, model] of DECLINATION_CHECKS) {
   console.log(`${failed ? "FAIL" : "ok  "} ${city.padEnd(12)} declination ${grid.toFixed(1)} (model ${model})`);
 }
 
-console.log(`\n${checkedDays - failedDays}/${checkedDays} checks passed: days within tolerance (app minus official, in minutes) or on the right day, the sun's altitude and the declination`);
+// The calendar the app downloads and the feed serves (functions/prayers.ics.js): 30 days of Makkah
+// from noon, so that day's Fajr is left out (Dhuhr is at 12:06); one alarm and one ID per prayer; every
+// line folded to 75 octets; and the feed's IDs name the place, so two cities' calendars never mix
+for (const feed of [false, true]) {
+  const ics = calendarIcs({
+    latitude: 21.427, longitude: 39.826, method: "UmmAlQura", madhab: "Shafi", place: "مكة المكرمة، السعودية",
+    now: new Date("2026-10-16T09:00:00Z"), days: 30, dayOf: dayIn("Asia/Riyadh"), feed,
+  });
+  const events = ics.split("BEGIN:VEVENT").length - 1;
+  const uids = new Set(ics.match(/^UID:.*$/gm));
+  const problems = [
+    events !== 30 * 5 - 1 && `${events} events, not 149`,
+    ics.split("BEGIN:VALARM").length - 1 !== events && "an event without its alarm",
+    uids.size !== events && "repeated event IDs",
+    ics.split("\r\n").some((line) => Buffer.byteLength(line) > 75) && "a line over 75 octets",
+    feed !== ics.includes("X-WR-CALNAME:") && "the calendar name",
+    feed !== [...uids].every((uid) => uid.includes("-21.427,39.826@")) && "event IDs without the place",
+  ].filter(Boolean);
+  checkedDays++;
+  failedDays += problems.length > 0;
+  console.log(`${problems.length ? "FAIL" : "ok  "} ${(feed ? "Feed" : "Download").padEnd(12)} ${events} prayers${problems.length ? ": " + problems.join(", ") : ", each with an alarm"}`);
+}
+
+console.log(`\n${checkedDays - failedDays}/${checkedDays} checks passed: days within tolerance (app minus official, in minutes) or on the right day, the sun's altitude, the declination and the calendars`);
 process.exitCode = failedDays ? 1 : 0;

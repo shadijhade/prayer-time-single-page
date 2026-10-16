@@ -255,7 +255,116 @@
     return (along(tenths[r]) * (1 - fr) + along(tenths[r + 1]) * fr) / 10;
   }
 
-  const prayerRules = { DEFAULT_METHOD, countryDefaults, prayerTimes, sunAltitude, declinationAt };
+  /**
+   * dayOf for a time zone (the device's if undefined): the calendar day an instant falls on there,
+   * plus offsetDays, as a local Date at noon, the form Adhan.js takes (noon is safe from DST shifts).
+   * Throws a RangeError for an unknown zone.
+   * @param {string} [timeZone]
+   * @returns {(instant: Date, offsetDays?: number) => Date}
+   */
+  function dayIn(timeZone) {
+    const format = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return (instant, offsetDays = 0) => {
+      const [year, month, day] = format.format(instant).split("-");
+      return new Date(year, month - 1, Number(day) + offsetDays, 12);
+    };
+  }
+
+  // --- Calendar (iCalendar, RFC 5545): the app's download and the feed calendars subscribe to ---
+  const CALENDAR_PRAYERS = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" };
+  const CALENDAR_EVENT_MS = 15 * 60000; // Each prayer's event
+  const FEED_REFRESH = "PT6H"; // How often a subscribed calendar should fetch the feed again
+  const utf8 = new TextEncoder();
+  /** An instant as an RFC 5545 UTC date-time, e.g. "20261015T021300Z". */
+  const icsTime = (date) => date.toISOString().replace(/[-:]|\.\d+/g, "");
+  /** A TEXT value: \ ; and , escaped, line breaks as \n (RFC 5545 3.3.11). */
+  const icsText = (text) => String(text).replace(/[\\;,]/g, "\\$&").replace(/\r\n?|\n/g, "\\n");
+
+  /** Folds a content line into lines of at most 75 octets (RFC 5545 3.1), never inside a character. */
+  function foldIcsLine(line) {
+    let folded = "";
+    let octets = 0;
+    for (const char of line) {
+      const size = utf8.encode(char).length;
+      if (octets + size > 75) {
+        folded += "\r\n "; // A continuation line starts with a space, which counts too
+        octets = 1;
+      }
+      folded += char;
+      octets += size;
+    }
+    return folded;
+  }
+
+  /**
+   * The five prayers of the next `days` days at a place as an .ics calendar, each with a reminder
+   * at its time; prayers before `now` (and invalid polar-night times) are left out.
+   * @param {object} options
+   * @param {number} options.latitude
+   * @param {number} options.longitude
+   * @param {string} options.method - As prayerTimes() takes it.
+   * @param {string} options.madhab
+   * @param {string} options.place - Shown in the events, e.g. "القاهرة، مصر".
+   * @param {Date} options.now
+   * @param {number} options.days
+   * @param {Function} options.dayOf - The place's calendar day, as dayIn() makes it.
+   * @param {boolean} [options.feed] - A subscription: the calendar gets a name and a refresh
+   *   interval, and the event IDs name the place, so two cities' calendars never mix.
+   * @returns {string}
+   */
+  function calendarIcs({ latitude, longitude, method, madhab, place, now, days, dayOf, feed }) {
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//prayer-times//ar", "CALSCALE:GREGORIAN"];
+    if (feed) {
+      lines.push(
+        `X-WR-CALNAME:${icsText(`مواقيت الصلاة - ${place}`)}`,
+        `REFRESH-INTERVAL;VALUE=DURATION:${FEED_REFRESH}`,
+        `X-PUBLISHED-TTL:${FEED_REFRESH}`
+      );
+    }
+    const uidPlace = feed ? `-${latitude},${longitude}` : ""; // Stable, so a refresh updates events
+    for (let i = 0; i < days; i++) {
+      const day = dayOf(now, i);
+      const dayId = day.getFullYear() * 10000 + (day.getMonth() + 1) * 100 + day.getDate();
+      const times = prayerTimes(latitude, longitude, day, method, madhab, dayOf);
+      for (const [key, prayer] of Object.entries(CALENDAR_PRAYERS)) {
+        const time = times[key];
+        if (!(time > now)) continue; // Passed reminders would show as overdue in some calendars
+        const name = `صلاة ${prayer}`;
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:${dayId}-${key}${uidPlace}@prayer-times`,
+          `DTSTAMP:${icsTime(now)}`,
+          `DTSTART:${icsTime(time)}`,
+          `DTEND:${icsTime(new Date(time.getTime() + CALENDAR_EVENT_MS))}`,
+          `SUMMARY:${name}`,
+          `DESCRIPTION:${icsText(`مواقيت الصلاة في ${place}`)}`,
+          "BEGIN:VALARM",
+          "ACTION:DISPLAY",
+          "TRIGGER:PT0S",
+          `DESCRIPTION:حان الآن وقت ${name}`,
+          "END:VALARM",
+          "END:VEVENT"
+        );
+      }
+    }
+    lines.push("END:VCALENDAR");
+    return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+  }
+
+  const prayerRules = {
+    DEFAULT_METHOD,
+    countryDefaults,
+    prayerTimes,
+    sunAltitude,
+    declinationAt,
+    dayIn,
+    calendarIcs,
+  };
   if (typeof module === "object" && module.exports) module.exports = prayerRules;
   else root.prayerRules = prayerRules;
 })(this);

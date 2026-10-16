@@ -113,14 +113,19 @@ jobs:
         deployments: write  # Crucial: Allows the action to create deployment statuses
 
     steps:
+      # The calendar feed (functions/prayers.ics.js) is a Pages Function: Wrangler bundles it from
+      # the repo, with the src/ files it imports, and serves only its path from it
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
       - name: Download Artifact
         uses: actions/download-artifact@v8
         with:
           name: prayer-times-dist # Must match the upload name
-          # No path specified = downloads to the root of the workspace
+          path: dist
 
       - name: List downloaded files (for debugging)
-        run: ls -la # Check if files are downloaded correctly
+        run: ls -la dist # Check if files are downloaded correctly
 
       # Wrangler runs on Node; don't depend on the runner image's default version
       - name: Set up Node.js
@@ -134,6 +139,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # The workspace root holds the downloaded build; branch main is the production deployment
-          command: pages deploy . --project-name=prayer-times-pwa --branch=main --commit-hash=${{ github.sha }}
+          # dist/ holds the build and ./functions the feed; branch main is the production deployment
+          command: pages deploy dist --project-name=prayer-times-pwa --branch=main --commit-hash=${{ github.sha }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }} # Associates deployment with commit

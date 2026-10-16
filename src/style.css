@@ -1524,6 +1524,41 @@ body:has(.install-banner:not([hidden])) {
   margin-top: var(--gap-md);
 }
 
+/* --- Calendar Sheet: subscribe, or download a file --- */
+.calendar-intro {
+  margin-bottom: var(--gap-lg);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.calendar-options {
+  display: grid;
+  gap: var(--gap-sm);
+}
+
+.calendar-option {
+  justify-content: flex-start;
+  padding: 0.7rem 1rem;
+  font-size: var(--font-size-base);
+  text-decoration: none;
+}
+
+.calendar-tips {
+  display: grid;
+  gap: var(--gap-xs);
+  margin-top: var(--gap-lg);
+  padding-inline-start: 1.2rem;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+/* The fallback, quieter than the subscriptions */
+.calendar-download {
+  align-self: center;
+  margin-top: var(--gap-md);
+  border-color: transparent;
+}
+
 /* --- Qibla Compass ---
    The dial turns against the phone's heading (--heading, degrees from true north, set by app.js),
    so its letters point to the real directions; the Kaaba sits on it at the Qibla's bearing (--qibla).
