@@ -35,7 +35,7 @@ const CONTENT_TYPES = {
 };
 // The phone shots are 390x844 at 2x (780x1688), the sizes manifest.json declares
 const PHONE = { width: 390, height: 844, scale: 2 };
-// Each at a time of today in Makkah (UTC+3), so the sky card shows a different sky
+// Each at a set time of today in Makkah (UTC+3), so retaking them gives the same screens
 const SCREENSHOTS = [
   { file: "screenshots/today.jpg", ...PHONE, theme: "light", time: "17:20" },
   { file: "screenshots/forecast.jpg", ...PHONE, theme: "light", time: "10:30", open: "forecast-sheet" },

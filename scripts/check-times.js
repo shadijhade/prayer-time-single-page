@@ -11,7 +11,7 @@ const path = require("path");
 
 const SRC = path.join(__dirname, "..", "src");
 globalThis.adhan = require(path.join(SRC, "adhan.umd.js"));
-const { countryDefaults, prayerTimes, sunAltitude, declinationAt, dayIn, calendarIcs } = require(path.join(SRC, "prayer-rules.js"));
+const { countryDefaults, prayerTimes, declinationAt, dayIn, calendarIcs } = require(path.join(SRC, "prayer-rules.js"));
 
 const PRAYERS = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 
@@ -470,28 +470,6 @@ for (const [city, latitude, longitude, timeZone] of DAY_CHECKS) {
   }
 }
 
-// The sky card's sun: at Adhan.js's sunrise and sunset it must be on the horizon (-0.833 degrees,
-// refraction included), within the half-minute rounding of those times
-const SKY_CHECKS = [
-  ["Makkah", 21.427, 39.826],
-  ["London", 51.509, -0.126],
-  ["Jakarta", -6.214, 106.845],
-  ["Reykjavik", 64.147, -21.942],
-];
-for (const [city, latitude, longitude] of SKY_CHECKS) {
-  const altitudes = [];
-  for (let month = 0; month < 12; month += 3) {
-    const coordinates = new adhan.Coordinates(latitude, longitude);
-    const date = new Date(2026, month, 15, 12);
-    const times = new adhan.PrayerTimes(coordinates, date, adhan.CalculationMethod.MuslimWorldLeague());
-    altitudes.push(sunAltitude(times.sunrise, latitude, longitude), sunAltitude(times.maghrib, latitude, longitude));
-  }
-  const failed = altitudes.some((altitude) => Math.abs(altitude + 0.833) > 0.3);
-  checkedDays++;
-  failedDays += failed;
-  console.log(`${failed ? "FAIL" : "ok  "} ${city.padEnd(12)} sun at sunrise and sunset: ${altitudes.map((altitude) => altitude.toFixed(2)).join(" ")} degrees`);
-}
-
 // The Qibla compass's declination, read from src/declination.json, against the World Magnetic
 // Model at the grid's epoch (scripts/build-declination.py), within the grid's interpolation error
 const declinationGrid = require(path.join(SRC, "declination.json"));
@@ -536,5 +514,5 @@ for (const feed of [false, true]) {
   console.log(`${problems.length ? "FAIL" : "ok  "} ${(feed ? "Feed" : "Download").padEnd(12)} ${events} prayers${problems.length ? ": " + problems.join(", ") : ", each with an alarm"}`);
 }
 
-console.log(`\n${checkedDays - failedDays}/${checkedDays} checks passed: days within tolerance (app minus official, in minutes) or on the right day, the sun's altitude, the declination and the calendars`);
+console.log(`\n${checkedDays - failedDays}/${checkedDays} checks passed: days within tolerance (app minus official, in minutes) or on the right day, the declination and the calendars`);
 process.exitCode = failedDays ? 1 : 0;

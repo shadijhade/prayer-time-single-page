@@ -213,34 +213,6 @@
   }
 
   /**
-   * The sun's altitude above the horizon, in degrees, at an instant (USNO's approximate solar
-   * position, good to about a minute of arc this century). The sky card follows it.
-   */
-  function sunAltitude(date, latitude, longitude) {
-    const rad = Math.PI / 180;
-    const d = date / 864e5 - 10957.5; // Days since 2000-01-01 12:00 UTC
-    const anomaly = (357.529 + 0.98560028 * d) * rad;
-    const meanLongitude = 280.459 + 0.98564736 * d;
-    const eclipticLongitude =
-      (meanLongitude + 1.915 * Math.sin(anomaly) + 0.02 * Math.sin(2 * anomaly)) * rad;
-    const obliquity = (23.439 - 0.00000036 * d) * rad;
-    const rightAscension = Math.atan2(
-      Math.cos(obliquity) * Math.sin(eclipticLongitude),
-      Math.cos(eclipticLongitude)
-    );
-    const declination = Math.asin(Math.sin(obliquity) * Math.sin(eclipticLongitude));
-    const siderealTime = (280.46061837 + 360.98564736629 * d) * rad; // Greenwich, mean
-    const hourAngle = siderealTime + longitude * rad - rightAscension;
-    const lat = latitude * rad;
-    return (
-      Math.asin(
-        Math.sin(lat) * Math.sin(declination) +
-          Math.cos(lat) * Math.cos(declination) * Math.cos(hourAngle)
-      ) / rad
-    );
-  }
-
-  /**
    * Magnetic declination (degrees east of true north) at a place, interpolated from the grid in
    * declination.json (scripts/build-declination.py). Places beyond the grid's latitudes get its edge.
    * @param {{south: number, west: number, step: number, tenths: number[][]}} grid
@@ -360,7 +332,6 @@
     DEFAULT_METHOD,
     countryDefaults,
     prayerTimes,
-    sunAltitude,
     declinationAt,
     dayIn,
     calendarIcs,

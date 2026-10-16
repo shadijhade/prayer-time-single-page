@@ -175,23 +175,6 @@
             <div class="countdown skeleton-text" id="countdown" role="timer">--:--:--</div>
             <div class="countdown-progress" id="countdown-progress" aria-hidden="true"></div>
             <div class="countdown-description skeleton-text" id="countdown-description"></div>
-            <!-- Living sky: once the location is known, the card takes the colours of the sky there now
-                 and this shows today's path of the sun, solar midnight to solar midnight, right to left
-                 like the cards, with the sun and the prayers on it (app.js) -->
-            <div class="sky-arc" id="sky-arc" role="img">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                    <line class="sky-horizon" id="sky-horizon" x1="0" x2="100"/>
-                    <path class="sky-path" id="sky-path"/>
-                    <path class="sky-path-past" id="sky-path-past"/>
-                </svg>
-                <span class="sky-marker" data-prayer="fajr"><svg class="icon" aria-hidden="true"><use href="#icon-nights_stay"/></svg></span>
-                <span class="sky-marker" data-prayer="sunrise"><svg class="icon" aria-hidden="true"><use href="#icon-wb_twilight"/></svg></span>
-                <span class="sky-marker" data-prayer="dhuhr"><svg class="icon" aria-hidden="true"><use href="#icon-sunny"/></svg></span>
-                <span class="sky-marker" data-prayer="asr"><svg class="icon" aria-hidden="true"><use href="#icon-partly_cloudy_day"/></svg></span>
-                <span class="sky-marker" data-prayer="maghrib"><svg class="icon" aria-hidden="true"><use href="#icon-water_lux"/></svg></span>
-                <span class="sky-marker" data-prayer="isha"><svg class="icon" aria-hidden="true"><use href="#icon-moon_stars"/></svg></span>
-                <span class="sky-sun" id="sky-sun"></span>
-            </div>
         </section>
 
         <!-- Zero-height sticky element: it gets "stuck" once the card above has scrolled away,

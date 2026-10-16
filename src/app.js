@@ -46,30 +46,6 @@
   ];
   const SHEET_CLOSE_DRAG_PX = 80; // A sheet dragged down farther than this closes
 
-  // --- Living Sky ---
-  // The sky card's colours by the sun's altitude in degrees: [altitude, top, middle, horizon], for
-  // mornings and evenings apart (dawn is cooler and pinker, dusk warmer). The browser mixes between.
-  const SKY_MORNING = [
-    [-18, "#050a1f", "#0b1433", "#16204a"],
-    [-12, "#0a1230", "#1b2558", "#3a2f6b"],
-    [-6, "#18275a", "#433f7e", "#b9607e"],
-    [0, "#2f4f8f", "#7d79b8", "#f5a58c"],
-    [8, "#4f8fd6", "#9cc8ef", "#fde3b5"],
-    [25, "#5aa9ec", "#a8d8f8", "#e3f4ff"],
-  ];
-  const SKY_EVENING = [
-    [-18, "#050a1f", "#0b1433", "#16204a"],
-    [-12, "#0b1230", "#22245a", "#4a2c62"],
-    [-6, "#1b2552", "#55396e", "#d0584a"],
-    [0, "#2e4682", "#9a6b9e", "#ff9a52"],
-    [8, "#4d86cc", "#e8b97a", "#ffb35c"],
-    [25, "#5aa9ec", "#a8d8f8", "#e3f4ff"],
-  ];
-  const SKY_DAY_ALTITUDE = 5; // Above this the sky is light enough for dark text (.sky-day)
-  const SKY_HORIZON_Y = 62; // The horizon in the sun's path, % from the top; the ground is below
-  const SKY_FAJR_ISHA_Y = 85; // Where 18° below the horizon (about Fajr and Isha) is drawn
-  const SUNRISE_ALTITUDE = -0.833; // The sun's centre at sunrise and sunset, refraction included
-
   // --- Qibla ---
   const KAABA = { latitude: 21.4225241, longitude: 39.8261818 }; // As Adhan.js's Qibla()
   const QIBLA_ALIGNED_DEGREES = 5; // Facing the Qibla within this many degrees
@@ -159,7 +135,6 @@
     isUpdateAvailable: false,
     waitingServiceWorker: null,
     pickerCities: null, // { countryCode, tz, cities } of the country shown in the city picker
-    skyMinute: null, // The minute the sky card was last drawn for
     qiblaBearing: null, // Degrees from true north, for the current location
     declination: 0, // Magnetic declination there, degrees east
     declinationGrid: null, // Promise of declination.json, fetched once
@@ -233,12 +208,6 @@
     domRefs.countrySelect = document.getElementById("country-select");
     domRefs.cityInput = document.getElementById("city-input");
     domRefs.cityList = document.getElementById("city-list");
-    domRefs.skyArc = document.getElementById("sky-arc");
-    domRefs.skyPath = document.getElementById("sky-path");
-    domRefs.skyPathPast = document.getElementById("sky-path-past");
-    domRefs.skyHorizon = document.getElementById("sky-horizon");
-    domRefs.skySun = document.getElementById("sky-sun");
-    domRefs.skyMarkers = document.querySelectorAll(".sky-marker");
     domRefs.qiblaButton = document.getElementById("qibla-btn");
     domRefs.qiblaSheet = document.getElementById("qibla-sheet");
     domRefs.compass = document.getElementById("compass");
@@ -1225,88 +1194,7 @@
     if (next !== appState.nextPrayer) {
       appState.nextPrayer = next;
       renderPrayerCards(next.key);
-      appState.skyMinute = null; // Highlight the new next prayer on the sun's path now
     }
-    // The sky changes slowly: once a minute is plenty
-    const minute = Math.floor(now / 6e4);
-    if (minute !== appState.skyMinute) {
-      appState.skyMinute = minute;
-      renderSky(now);
-    }
-  }
-
-  /**
-   * The sky card: the colours of the sky at the location now, stars at night, and today's path of
-   * the sun with the sun and each prayer on it. The path runs solar midnight to solar midnight
-   * around the solar noon nearest now, right to left like the prayer cards.
-   * @param {Date} now
-   */
-  function renderSky(now) {
-    const { nextPrayerInfo: card, skyArc: arc } = domRefs;
-    const times = appState.currentPrayerTimes;
-    const location = appState.currentLocation;
-    if (!card || !arc || !times || !location) return;
-    const altitudeAt = (instant) =>
-      prayerRules.sunAltitude(new Date(instant), location.latitude, location.longitude);
-    const altitude = altitudeAt(now);
-    // After solar midnight it's the next day's path (and before it, the previous day's)
-    const shift = Math.round((now - times.dhuhr) / 864e5) * 864e5;
-    const noon = times.dhuhr.getTime() + shift;
-    const start = noon - 432e5;
-
-    // Colours: between the two palette stops around the altitude
-    const stops = now < noon ? SKY_MORNING : SKY_EVENING;
-    const above = stops.findIndex(([stopAltitude]) => stopAltitude >= altitude);
-    const upper = Math.max(above === -1 ? stops.length - 1 : above, 1);
-    const [low, ...from] = stops[upper - 1];
-    const [high, ...to] = stops[upper];
-    const share = Math.min(Math.max((altitude - low) / (high - low), 0), 1);
-    ["--sky-top", "--sky-mid", "--sky-low"].forEach((property, i) =>
-      card.style.setProperty(
-        property,
-        `color-mix(in oklab, ${to[i]} ${(share * 100).toFixed(1)}%, ${from[i]})`
-      )
-    );
-    card.style.setProperty("--stars", Math.min(Math.max((-4 - altitude) / 8, 0), 1).toFixed(2));
-    card.classList.add("sky");
-    card.classList.toggle("sky-day", altitude > SKY_DAY_ALTITUDE);
-
-    // The path, in % of the box: above the horizon it reaches up to the noon altitude, below it
-    // 18° (about Fajr and Isha) is at SKY_FAJR_ISHA_Y and deeper night runs off the bottom
-    const peak = Math.max(altitudeAt(noon), 1);
-    const x = (instant) => 100 - ((instant - start) / 864e5) * 100;
-    const y = (sunAltitude) =>
-      sunAltitude >= 0
-        ? SKY_HORIZON_Y * (1 - 0.8 * (sunAltitude / peak))
-        : SKY_HORIZON_Y + (SKY_FAJR_ISHA_Y - SKY_HORIZON_Y) * (-sunAltitude / 18);
-    const point = (instant) => `${x(instant).toFixed(2)} ${y(altitudeAt(instant)).toFixed(2)}`;
-    const path = [];
-    for (let instant = start; instant <= start + 864e5; instant += 6e5) path.push(point(instant));
-    const travelled = path.slice(0, Math.floor((now - start) / 6e5) + 1).concat(point(now));
-    domRefs.skyPath.setAttribute("d", `M${path.join("L")}`);
-    domRefs.skyPathPast.setAttribute("d", `M${travelled.join("L")}`);
-    domRefs.skyHorizon.setAttribute("y1", SKY_HORIZON_Y);
-    domRefs.skyHorizon.setAttribute("y2", SKY_HORIZON_Y);
-    arc.style.setProperty("--horizon", `${SKY_HORIZON_Y}%`);
-
-    const nextKey = appState.nextPrayer?.key;
-    domRefs.skyMarkers.forEach((marker) => {
-      const key = marker.dataset.prayer;
-      const instant = times[key].getTime() + shift;
-      marker.style.left = `${x(instant)}%`;
-      marker.style.top = `${y(altitudeAt(instant))}%`;
-      marker.classList.toggle("next", key === nextKey);
-      marker.classList.toggle("passed", key !== nextKey && instant < now);
-    });
-    domRefs.skySun.style.left = `${x(now)}%`;
-    domRefs.skySun.style.top = `${y(altitude)}%`;
-    domRefs.skySun.classList.toggle("down", altitude < SUNRISE_ALTITUDE);
-    arc.setAttribute(
-      "aria-label",
-      altitude >= SUNRISE_ALTITUDE
-        ? `الشمس الآن على ارتفاع ${Math.round(altitude)}° فوق الأفق`
-        : `الشمس الآن تحت الأفق بـ ${Math.round(-altitude)}°`
-    );
   }
 
   /**
