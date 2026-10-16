@@ -1,5 +1,5 @@
 // Retakes the images the app is installed with, from the app itself, in headless Chrome or Edge:
-// - src/screenshots/: the install dialog's screenshots (manifest.json "screenshots"), of Makkah
+// - src/screenshots/: the install dialog's screenshots (manifest.json "screenshots"), of Makkah at set times
 // - src/splash/: iPhone launch screens, light and dark, one per size in IOS_LAUNCH_SCREEN_SIZES (src/app.js)
 // - src/icon-maskable-512.png, apple-touch-icon.png and shortcut-*.png, drawn from web-app-manifest-512x512.png
 // Usage: node scripts/make-install-assets.mjs   (CHROME=<path to chrome or msedge> if it isn't found)
@@ -35,11 +35,12 @@ const CONTENT_TYPES = {
 };
 // The phone shots are 390x844 at 2x (780x1688), the sizes manifest.json declares
 const PHONE = { width: 390, height: 844, scale: 2 };
+// Each at a time of today in Makkah (UTC+3), so the sky card shows a different sky
 const SCREENSHOTS = [
-  { file: "screenshots/today.jpg", ...PHONE, theme: "light" },
-  { file: "screenshots/forecast.jpg", ...PHONE, theme: "light", open: "forecast-sheet" },
-  { file: "screenshots/dark.jpg", ...PHONE, theme: "dark" },
-  { file: "screenshots/desktop.jpg", width: 1280, height: 800, scale: 1, theme: "light" },
+  { file: "screenshots/today.jpg", ...PHONE, theme: "light", time: "17:20" },
+  { file: "screenshots/forecast.jpg", ...PHONE, theme: "light", time: "10:30", open: "forecast-sheet" },
+  { file: "screenshots/dark.jpg", ...PHONE, theme: "dark", time: "20:45" },
+  { file: "screenshots/desktop.jpg", width: 1280, height: 800, scale: 1, theme: "light", time: "06:50" },
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -214,7 +215,7 @@ async function drawIconsAndLaunchScreens(launchSizes) {
   files["apple-touch-icon.png"] = icon(180, 1.08).toDataURL();
 
   // Shortcuts: the page's sprite glyphs in teal; Android puts them on a white circle
-  const shortcuts = { locate: "my_location", city: "location_on", forecast: "calendar_month" };
+  const shortcuts = { locate: "my_location", qibla: "explore", city: "location_on", forecast: "calendar_month" };
   for (const [name, symbol] of Object.entries(shortcuts)) {
     const result = canvas(192, 192);
     const ctx = result.getContext("2d");
@@ -249,9 +250,27 @@ async function drawIconsAndLaunchScreens(launchSizes) {
   return files;
 }
 
-/** Captures the app in Makkah at the given viewport and theme, optionally with a sheet open. */
-async function screenshot(tab, origin, { width, height, scale, theme, open }) {
+let clockScript = null; // The tab's script that sets the page's clock
+
+/** Captures the app in Makkah at the given viewport, theme and time, optionally with a sheet open. */
+async function screenshot(tab, origin, { width, height, scale, theme, time, open }) {
   const mobile = width < 600;
+  // The page's clock runs from that time (Date only; the Ramadan countdown's Temporal keeps the day)
+  const [hours, minutes] = time.split(":").map(Number);
+  const today = new Date(Date.now() + 3 * 36e5); // The date in Makkah
+  const at = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), hours - 3, minutes);
+  if (clockScript) await tab("Page.removeScriptToEvaluateOnNewDocument", { identifier: clockScript });
+  ({ identifier: clockScript } = await tab("Page.addScriptToEvaluateOnNewDocument", {
+    source: `{
+      const shift = ${at} - Date.now();
+      const RealDate = Date;
+      globalThis.Date = class extends RealDate {
+        constructor(...args) { super(...(args.length ? args : [RealDate.now() + shift])); }
+        static now() { return RealDate.now() + shift; }
+        static [Symbol.hasInstance](value) { return value instanceof RealDate; }
+      };
+    }`,
+  }));
   await tab("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile });
   await tab("Emulation.setTouchEmulationEnabled", mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
   await tab("Emulation.setEmulatedMedia", {

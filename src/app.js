@@ -46,6 +46,40 @@
   ];
   const SHEET_CLOSE_DRAG_PX = 80; // A sheet dragged down farther than this closes
 
+  // --- Living Sky ---
+  // The sky card's colours by the sun's altitude in degrees: [altitude, top, middle, horizon], for
+  // mornings and evenings apart (dawn is cooler and pinker, dusk warmer). The browser mixes between.
+  const SKY_MORNING = [
+    [-18, "#050a1f", "#0b1433", "#16204a"],
+    [-12, "#0a1230", "#1b2558", "#3a2f6b"],
+    [-6, "#18275a", "#433f7e", "#b9607e"],
+    [0, "#2f4f8f", "#7d79b8", "#f5a58c"],
+    [8, "#4f8fd6", "#9cc8ef", "#fde3b5"],
+    [25, "#5aa9ec", "#a8d8f8", "#e3f4ff"],
+  ];
+  const SKY_EVENING = [
+    [-18, "#050a1f", "#0b1433", "#16204a"],
+    [-12, "#0b1230", "#22245a", "#4a2c62"],
+    [-6, "#1b2552", "#55396e", "#d0584a"],
+    [0, "#2e4682", "#9a6b9e", "#ff9a52"],
+    [8, "#4d86cc", "#e8b97a", "#ffb35c"],
+    [25, "#5aa9ec", "#a8d8f8", "#e3f4ff"],
+  ];
+  const SKY_DAY_ALTITUDE = 5; // Above this the sky is light enough for dark text (.sky-day)
+  const SKY_HORIZON_Y = 62; // The horizon in the sun's path, % from the top; the ground is below
+  const SKY_FAJR_ISHA_Y = 85; // Where 18° below the horizon (about Fajr and Isha) is drawn
+  const SUNRISE_ALTITUDE = -0.833; // The sun's centre at sunrise and sunset, refraction included
+
+  // --- Qibla ---
+  const KAABA = { latitude: 21.4225241, longitude: 39.8261818 }; // As Adhan.js's Qibla()
+  const QIBLA_ALIGNED_DEGREES = 5; // Facing the Qibla within this many degrees
+  const COMPASS_SMOOTHING = 0.25; // Share of each compass reading taken: a steadier dial
+  const COMPASS_WAIT_MS = 2000; // No reading by then: the device has no compass
+  const DIRECTIONS_AR = [
+    "الشمال", "الشمال الشرقي", "الشرق", "الجنوب الشرقي",
+    "الجنوب", "الجنوب الغربي", "الغرب", "الشمال الغربي",
+  ];
+
   // --- City Centres ---
   // Times are calculated for the user's city centre, like the timetables mosques publish
   const CITY_SNAP_RADIUS_KM = 15; // The most populous place this close is the user's city
@@ -125,6 +159,13 @@
     isUpdateAvailable: false,
     waitingServiceWorker: null,
     pickerCities: null, // { countryCode, tz, cities } of the country shown in the city picker
+    skyMinute: null, // The minute the sky card was last drawn for
+    qiblaBearing: null, // Degrees from true north, for the current location
+    declination: 0, // Magnetic declination there, degrees east
+    declinationGrid: null, // Promise of declination.json, fetched once
+    compassEvent: null, // The orientation event being listened to while the Qibla sheet is open
+    compassHeading: null, // Smoothed, unwrapped heading from true north (may pass 360)
+    compassAligned: false,
   };
 
   // ==============================================
@@ -186,6 +227,20 @@
     domRefs.countrySelect = document.getElementById("country-select");
     domRefs.cityInput = document.getElementById("city-input");
     domRefs.cityList = document.getElementById("city-list");
+    domRefs.skyArc = document.getElementById("sky-arc");
+    domRefs.skyPath = document.getElementById("sky-path");
+    domRefs.skyPathPast = document.getElementById("sky-path-past");
+    domRefs.skyHorizon = document.getElementById("sky-horizon");
+    domRefs.skySun = document.getElementById("sky-sun");
+    domRefs.skyMarkers = document.querySelectorAll(".sky-marker");
+    domRefs.qiblaButton = document.getElementById("qibla-btn");
+    domRefs.qiblaSheet = document.getElementById("qibla-sheet");
+    domRefs.compass = document.getElementById("compass");
+    domRefs.compassDial = document.getElementById("compass-dial");
+    domRefs.compassQibla = document.getElementById("compass-qibla");
+    domRefs.qiblaStatus = document.getElementById("qibla-status");
+    domRefs.qiblaDetails = document.getElementById("qibla-details");
+    domRefs.compassStart = document.getElementById("compass-start");
   }
 
   // ==============================================
@@ -685,11 +740,13 @@
     return response.json();
   }
 
-  /** Approximate distance in km, accurate enough over the few kilometres that matter here. */
+  /** Great-circle distance in km (haversine): to the nearest cities, and to the Kaaba. */
   function distanceKm(lat1, lon1, lat2, lon2) {
-    const dLon = ((lon2 - lon1 + 540) % 360) - 180; // The short way, also across the antimeridian
-    const x = dLon * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
-    return Math.hypot(x, lat2 - lat1) * 111.2;
+    const rad = Math.PI / 180;
+    const a =
+      Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(a)); // Earth's mean diameter
   }
 
   /** Whether a position is in an index.json box; east exceeds 180 for boxes across the antimeridian. */
@@ -1162,7 +1219,88 @@
     if (next !== appState.nextPrayer) {
       appState.nextPrayer = next;
       renderPrayerCards(next.key);
+      appState.skyMinute = null; // Highlight the new next prayer on the sun's path now
     }
+    // The sky changes slowly: once a minute is plenty
+    const minute = Math.floor(now / 6e4);
+    if (minute !== appState.skyMinute) {
+      appState.skyMinute = minute;
+      renderSky(now);
+    }
+  }
+
+  /**
+   * The sky card: the colours of the sky at the location now, stars at night, and today's path of
+   * the sun with the sun and each prayer on it. The path runs solar midnight to solar midnight
+   * around the solar noon nearest now, right to left like the prayer cards.
+   * @param {Date} now
+   */
+  function renderSky(now) {
+    const { nextPrayerInfo: card, skyArc: arc } = domRefs;
+    const times = appState.currentPrayerTimes;
+    const location = appState.currentLocation;
+    if (!card || !arc || !times || !location) return;
+    const altitudeAt = (instant) =>
+      prayerRules.sunAltitude(new Date(instant), location.latitude, location.longitude);
+    const altitude = altitudeAt(now);
+    // After solar midnight it's the next day's path (and before it, the previous day's)
+    const shift = Math.round((now - times.dhuhr) / 864e5) * 864e5;
+    const noon = times.dhuhr.getTime() + shift;
+    const start = noon - 432e5;
+
+    // Colours: between the two palette stops around the altitude
+    const stops = now < noon ? SKY_MORNING : SKY_EVENING;
+    const above = stops.findIndex(([stopAltitude]) => stopAltitude >= altitude);
+    const upper = Math.max(above === -1 ? stops.length - 1 : above, 1);
+    const [low, ...from] = stops[upper - 1];
+    const [high, ...to] = stops[upper];
+    const share = Math.min(Math.max((altitude - low) / (high - low), 0), 1);
+    ["--sky-top", "--sky-mid", "--sky-low"].forEach((property, i) =>
+      card.style.setProperty(
+        property,
+        `color-mix(in oklab, ${to[i]} ${(share * 100).toFixed(1)}%, ${from[i]})`
+      )
+    );
+    card.style.setProperty("--stars", Math.min(Math.max((-4 - altitude) / 8, 0), 1).toFixed(2));
+    card.classList.add("sky");
+    card.classList.toggle("sky-day", altitude > SKY_DAY_ALTITUDE);
+
+    // The path, in % of the box: above the horizon it reaches up to the noon altitude, below it
+    // 18° (about Fajr and Isha) is at SKY_FAJR_ISHA_Y and deeper night runs off the bottom
+    const peak = Math.max(altitudeAt(noon), 1);
+    const x = (instant) => 100 - ((instant - start) / 864e5) * 100;
+    const y = (sunAltitude) =>
+      sunAltitude >= 0
+        ? SKY_HORIZON_Y * (1 - 0.8 * (sunAltitude / peak))
+        : SKY_HORIZON_Y + (SKY_FAJR_ISHA_Y - SKY_HORIZON_Y) * (-sunAltitude / 18);
+    const point = (instant) => `${x(instant).toFixed(2)} ${y(altitudeAt(instant)).toFixed(2)}`;
+    const path = [];
+    for (let instant = start; instant <= start + 864e5; instant += 6e5) path.push(point(instant));
+    const travelled = path.slice(0, Math.floor((now - start) / 6e5) + 1).concat(point(now));
+    domRefs.skyPath.setAttribute("d", `M${path.join("L")}`);
+    domRefs.skyPathPast.setAttribute("d", `M${travelled.join("L")}`);
+    domRefs.skyHorizon.setAttribute("y1", SKY_HORIZON_Y);
+    domRefs.skyHorizon.setAttribute("y2", SKY_HORIZON_Y);
+    arc.style.setProperty("--horizon", `${SKY_HORIZON_Y}%`);
+
+    const nextKey = appState.nextPrayer?.key;
+    domRefs.skyMarkers.forEach((marker) => {
+      const key = marker.dataset.prayer;
+      const instant = times[key].getTime() + shift;
+      marker.style.left = `${x(instant)}%`;
+      marker.style.top = `${y(altitudeAt(instant))}%`;
+      marker.classList.toggle("next", key === nextKey);
+      marker.classList.toggle("passed", key !== nextKey && instant < now);
+    });
+    domRefs.skySun.style.left = `${x(now)}%`;
+    domRefs.skySun.style.top = `${y(altitude)}%`;
+    domRefs.skySun.classList.toggle("down", altitude < SUNRISE_ALTITUDE);
+    arc.setAttribute(
+      "aria-label",
+      altitude >= SUNRISE_ALTITUDE
+        ? `الشمس الآن على ارتفاع ${Math.round(altitude)}° فوق الأفق`
+        : `الشمس الآن تحت الأفق بـ ${Math.round(-altitude)}°`
+    );
   }
 
   /**
@@ -1890,6 +2028,133 @@
   }
 
   // ==============================================
+  //          Qibla Compass
+  // ==============================================
+
+  /** "اتجاه القبلة": the Qibla sheet, or the city picker first while there's no location. */
+  function openQibla() {
+    if (!appState.currentLocation) {
+      domRefs.citySheet?.showPopover();
+      return;
+    }
+    if (!domRefs.qiblaSheet.matches(":popover-open")) domRefs.qiblaSheet.showPopover();
+    startCompass(); // Still in the tap, so iOS can ask for the compass straight away
+  }
+
+  /** Fills the sheet for the location: the Qibla's bearing from true north, and the Kaaba's distance. */
+  async function renderQibla() {
+    const { latitude, longitude } = appState.currentLocation;
+    const bearing = adhan.Qibla(new adhan.Coordinates(latitude, longitude));
+    appState.qiblaBearing = bearing;
+    domRefs.compassQibla.style.setProperty("--qibla", `${bearing.toFixed(1)}deg`);
+    const km = Math.round(distanceKm(latitude, longitude, KAABA.latitude, KAABA.longitude));
+    domRefs.qiblaDetails.textContent = `القبلة على ${Math.round(bearing)}° من الشمال (${
+      DIRECTIONS_AR[Math.round(bearing / 45) % 8]
+    })، والكعبة على بعد ${km.toLocaleString("ar-u-nu-latn")} كم`;
+    setTextIfChanged(domRefs.qiblaStatus, "جارٍ تشغيل البوصلة…");
+    // Phone compasses point to magnetic north; the grid gives the difference to true north here
+    try {
+      appState.declinationGrid ??= fetch("declination.json").then((response) => {
+        if (!response.ok) throw new Error(`declination.json: HTTP ${response.status}`);
+        return response.json();
+      });
+      appState.declination = prayerRules.declinationAt(
+        await appState.declinationGrid,
+        latitude,
+        longitude
+      );
+    } catch (error) {
+      // ponytail: magnetic north until the grid loads (a few degrees off in most Muslim countries)
+      appState.declinationGrid = null;
+      appState.declination = 0;
+      console.error("No declination:", error);
+    }
+  }
+
+  /** Listens to the compass; iOS asks the user first, which needs a tap (#compass-start). */
+  async function startCompass() {
+    if (appState.compassEvent) return;
+    if (typeof window.DeviceOrientationEvent?.requestPermission === "function") {
+      try {
+        if ((await DeviceOrientationEvent.requestPermission()) !== "granted") {
+          showCompassFallback("لم يُسمح باستخدام البوصلة.");
+          return;
+        }
+      } catch {
+        // Not from a tap (opened by a shortcut): the button asks
+        domRefs.compassStart.hidden = false;
+        setTextIfChanged(domRefs.qiblaStatus, "اضغط «تشغيل البوصلة» لتدور الدائرة مع هاتفك.");
+        return;
+      }
+    }
+    domRefs.compassStart.hidden = true;
+    // Chromium's absolute event has true compass readings; iOS puts them on the plain one
+    appState.compassEvent =
+      "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+    window.addEventListener(appState.compassEvent, handleCompassReading);
+    setTimeout(() => {
+      if (appState.compassEvent && appState.compassHeading === null) {
+        showCompassFallback("لا تتوفر بوصلة في هذا الجهاز.");
+      }
+    }, COMPASS_WAIT_MS);
+  }
+
+  function stopCompass() {
+    if (appState.compassEvent) {
+      window.removeEventListener(appState.compassEvent, handleCompassReading);
+    }
+    appState.compassEvent = null;
+    appState.compassHeading = null;
+    appState.compassAligned = false;
+    domRefs.compass?.classList.remove("aligned");
+    domRefs.compassDial?.style.removeProperty("--heading");
+  }
+
+  /** Without a compass the dial stays put, north at the top, with the Kaaba at its bearing. */
+  function showCompassFallback(reason) {
+    setTextIfChanged(domRefs.qiblaStatus, `${reason} الشمال أعلى الدائرة والكعبة في اتجاه القبلة.`);
+  }
+
+  /**
+   * Turns the dial with the phone and says which way to turn. Headings are from magnetic north;
+   * the declination makes them true, and the screen's rotation counts for landscape.
+   * @param {DeviceOrientationEvent} event
+   */
+  function handleCompassReading(event) {
+    // iOS: a compass heading, clockwise; elsewhere absolute alpha, which turns counter-clockwise
+    const magnetic =
+      event.webkitCompassHeading ?? (event.absolute && event.alpha !== null ? 360 - event.alpha : null);
+    if (magnetic === null || magnetic === undefined || magnetic < 0) return; // Not calibrated
+    const heading = magnetic + appState.declination + (screen.orientation?.angle ?? 0);
+    const previous = appState.compassHeading ?? heading;
+    const turn = ((((heading - previous) % 360) + 540) % 360) - 180; // The short way round
+    appState.compassHeading = previous + turn * COMPASS_SMOOTHING;
+    domRefs.compassDial.style.setProperty("--heading", appState.compassHeading.toFixed(1));
+
+    const offset = ((((appState.qiblaBearing - appState.compassHeading) % 360) + 540) % 360) - 180;
+    const aligned = Math.abs(offset) <= QIBLA_ALIGNED_DEGREES;
+    if (aligned && !appState.compassAligned) navigator.vibrate?.(40);
+    appState.compassAligned = aligned;
+    domRefs.compass.classList.toggle("aligned", aligned);
+    // Rounded to 5°, so it doesn't flicker (or keep a screen reader talking)
+    setTextIfChanged(
+      domRefs.qiblaStatus,
+      aligned
+        ? "أنت باتجاه القبلة"
+        : `استدر ${offset > 0 ? "يمينًا" : "يسارًا"} ${Math.round(Math.abs(offset) / 5) * 5}°`
+    );
+  }
+
+  function setupQibla() {
+    domRefs.qiblaButton?.addEventListener("click", openQibla);
+    domRefs.compassStart?.addEventListener("click", startCompass);
+    domRefs.qiblaSheet?.addEventListener("beforetoggle", (event) => {
+      if (event.newState === "open") renderQibla();
+      else stopCompass();
+    });
+  }
+
+  // ==============================================
   //          Installed App: Shortcuts & Install Button
   // ==============================================
 
@@ -1907,6 +2172,7 @@
       forecast: appState.currentLocation ? domRefs.forecastSheet : domRefs.citySheet,
     }[action];
     if (action === "locate") domRefs.locationButton.click(); // Ignored while already locating
+    else if (action === "qibla") openQibla();
     else if (sheet && !sheet.matches(":popover-open")) sheet.showPopover();
     // Leave a plain "/" behind so a reload doesn't repeat the action
     history.replaceState(null, "", location.pathname);
@@ -2052,6 +2318,7 @@
     initializeUiEffects(); // Setup cursor light effect (checks for touch)
     setupCountdownPip(); // Floating countdown where supported
     setupInstall();
+    setupQibla();
     document.querySelectorAll(".forecast-sheet").forEach(setupSheetSwipe);
     // iOS Safari applies :active (the pressed state in style.css) only once a touch listener exists
     document.addEventListener("touchstart", () => {}, { passive: true });

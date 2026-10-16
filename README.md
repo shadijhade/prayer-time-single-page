@@ -5,7 +5,9 @@ A lightweight, accurate, and offline-capable Progressive Web Application (PWA) f
 ## 🚀 Features
 
 - **City-centre prayer times**: Your position is matched to your city's centre, like the timetables mosques publish, or you pick the city by hand. Times are calculated with `adhan.js`; a city picked by hand shows its own clock.
-- **Checked against official timetables**: `node scripts/check-times.js` compares the app with the times 20 authorities publish for 23 cities: Umm al-Qura, Diyanet, JAKIM, MUIS, Kemenag, Egypt's Survey Authority, the Jordanian, Moroccan, Omani, Bahraini and Algerian ministries, Qatar, Banuri Town (Karachi), the Moonsighting Committee (London, New York), the UAE's Awqaf (Abu Dhabi, Dubai), Iraq's Sunni Endowment, Sudan's Fiqh Academy, Libya's Dar al-Ifta, Tunisia's meteorology institute and the Islamic Foundation Bangladesh. Every checked day is within a minute, or two for one day of Makkah and for Tunis's winter Asr. Kuwait and India aren't checked: neither publishes a timetable online that the check can use.
+- **Checked against official timetables**: `node scripts/check-times.js` compares the app with the times 20 authorities publish for 23 cities: Umm al-Qura, Diyanet, JAKIM, MUIS, Kemenag, Egypt's Survey Authority, the Jordanian, Moroccan, Omani, Bahraini and Algerian ministries, Qatar, Banuri Town (Karachi), the Moonsighting Committee (London, New York), the UAE's Awqaf (Abu Dhabi, Dubai), Iraq's Sunni Endowment, Sudan's Fiqh Academy, Libya's Dar al-Ifta, Tunisia's meteorology institute and the Islamic Foundation Bangladesh. Every checked day is within a minute, or two for one day of Makkah and for Tunis's winter Asr. Kuwait and India aren't checked: neither publishes a timetable online that the check can use. The same check confirms the sky card's sun sits on the horizon at sunrise and sunset, and that the compass reads the declination grid as the magnetic model gives it.
+- **Living sky**: The next-prayer card shows the sky over your city right now (dawn, daylight, golden hour, dusk, and night with stars) and today's path of the sun, with the sun and every prayer on it. It's all calculated on the device from the sun's position.
+- **Qibla compass**: Points to the Kaaba from your city with the phone's compass, corrected from magnetic to true north with NOAA's World Magnetic Model, and gives the bearing and the distance. It says which way to turn and vibrates (Android) when you face the Qibla; on a device without a compass the dial shows north up.
 - **Private and free to run**: No third-party requests at all. City data, fonts and icons are served with the app, and your location never leaves the device.
 - **Offline Support**: The app opens from the Service Worker cache, so it starts instantly and works offline.
 - **Installs like a native app**: Opens standalone on iPhone and Android, with a maskable icon, iPhone launch screens, a status bar in the header's colour and bottom sheets that close with a swipe. An install banner opens the browser's install dialog (with screenshots and a description on Android and desktop) or shows the Add to Home Screen steps on iPhone.
@@ -40,6 +42,12 @@ This project leverages modern web technologies to ensure speed, reliability, and
 `src/cities/` holds one JSON file per country with every place of 5,000+ people (Arabic name, coordinates, population, time zone), plus `index.json` with each country's bounding box. It is generated from [GeoNames](https://www.geonames.org/). To refresh it (downloads ~210 MB once, into the folder you pass):
 ```bash
 python scripts/build-cities.py path/to/download-folder
+```
+
+### Magnetic Declination
+`src/declination.json` is the declination (degrees east of true north) on a 5° grid, for the middle of the [World Magnetic Model](https://www.ncei.noaa.gov/products/world-magnetic-model)'s validity (WMM2025: 2025 to 2030). It's within 1.5° of the model between 55°S and 60°N. Rebuild it from the coefficients zip; with the test values file the model is first checked against NOAA's results:
+```bash
+python scripts/build-declination.py path/to/WMM2025.COF path/to/WMM2025_TestValues.txt
 ```
 
 ### Install Images
@@ -93,3 +101,4 @@ This project is licensed under the ISC License. Bundled third-party material:
 - City data © [GeoNames](https://www.geonames.org/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - [Tajawal](https://fonts.google.com/specimen/Tajawal) font, SIL Open Font License (`src/fonts/OFL.txt`).
 - [Material Symbols](https://fonts.google.com/icons) icons, Apache License 2.0.
+- Magnetic declination from the [World Magnetic Model](https://www.ncei.noaa.gov/products/world-magnetic-model) (NOAA NCEI and the British Geological Survey), public domain.

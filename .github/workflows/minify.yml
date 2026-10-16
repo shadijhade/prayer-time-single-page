@@ -80,6 +80,8 @@ jobs:
            # Copy all PNG images, and the link-preview image
            cp src/*.png dist/ 2>/dev/null || echo "Info: No *.png files found in src/."
            cp src/og-image.jpg dist/
+           # The Qibla compass's declination grid (scripts/build-declination.py)
+           cp src/declination.json dist/
            # Copy favicons
            cp src/favicon.ico dist/ 2>/dev/null || echo "Info: No favicon.ico found in src/."
            # Note: favicon-96x96.png and apple-touch-icon.png are covered by *.png

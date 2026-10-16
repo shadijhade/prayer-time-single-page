@@ -1,7 +1,7 @@
 // sw.js: the app shell is served cache-first, so the app opens instantly and works offline
 // (prayer times are calculated on the device). City files are stale-while-revalidate.
 // Bump APP_SHELL_CACHE_NAME whenever a file in APP_SHELL_ASSETS changes, or returning users keep the old one.
-const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.9.0";
+const APP_SHELL_CACHE_NAME = "prayer-times-shell-v1.10.0";
 const CITIES_CACHE_NAME = "prayer-times-cities-v1";
 
 const APP_SHELL_ASSETS = [
@@ -13,6 +13,7 @@ const APP_SHELL_ASSETS = [
   "manifest.json",
   "favicon.ico",
   "favicon-96x96.png",
+  "declination.json", // The Qibla compass's magnetic declination grid
   "fonts/tajawal-400-arabic.woff2",
   "fonts/tajawal-400-latin.woff2",
   "fonts/tajawal-500-arabic.woff2",

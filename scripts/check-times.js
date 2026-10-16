@@ -11,7 +11,7 @@ const path = require("path");
 
 const SRC = path.join(__dirname, "..", "src");
 globalThis.adhan = require(path.join(SRC, "adhan.umd.js"));
-const { countryDefaults, prayerTimes } = require(path.join(SRC, "prayer-rules.js"));
+const { countryDefaults, prayerTimes, sunAltitude, declinationAt } = require(path.join(SRC, "prayer-rules.js"));
 
 const PRAYERS = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
 
@@ -470,5 +470,48 @@ for (const [city, latitude, longitude, timeZone] of DAY_CHECKS) {
   }
 }
 
-console.log(`\n${checkedDays - failedDays}/${checkedDays} days within tolerance (app minus official, in minutes) or on the right day`);
+// The sky card's sun: at Adhan.js's sunrise and sunset it must be on the horizon (-0.833 degrees,
+// refraction included), within the half-minute rounding of those times
+const SKY_CHECKS = [
+  ["Makkah", 21.427, 39.826],
+  ["London", 51.509, -0.126],
+  ["Jakarta", -6.214, 106.845],
+  ["Reykjavik", 64.147, -21.942],
+];
+for (const [city, latitude, longitude] of SKY_CHECKS) {
+  const altitudes = [];
+  for (let month = 0; month < 12; month += 3) {
+    const coordinates = new adhan.Coordinates(latitude, longitude);
+    const date = new Date(2026, month, 15, 12);
+    const times = new adhan.PrayerTimes(coordinates, date, adhan.CalculationMethod.MuslimWorldLeague());
+    altitudes.push(sunAltitude(times.sunrise, latitude, longitude), sunAltitude(times.maghrib, latitude, longitude));
+  }
+  const failed = altitudes.some((altitude) => Math.abs(altitude + 0.833) > 0.3);
+  checkedDays++;
+  failedDays += failed;
+  console.log(`${failed ? "FAIL" : "ok  "} ${city.padEnd(12)} sun at sunrise and sunset: ${altitudes.map((altitude) => altitude.toFixed(2)).join(" ")} degrees`);
+}
+
+// The Qibla compass's declination, read from src/declination.json, against the World Magnetic
+// Model at the grid's epoch (scripts/build-declination.py), within the grid's interpolation error
+const declinationGrid = require(path.join(SRC, "declination.json"));
+const DECLINATION_CHECKS = [
+  ["Makkah", 21.427, 39.826, 3.5],
+  ["Cairo", 30.044, 31.236, 4.8],
+  ["New York", 40.713, -74.006, -12.4],
+  ["Seattle", 47.606, -122.332, 14.8],
+  ["Jakarta", -6.214, 106.845, 0.7],
+  ["Sydney", -33.868, 151.207, 12.8],
+  ["London", 51.509, -0.126, 1.3],
+  ["Kuala Lumpur", 3.141, 101.687, 0.1],
+];
+for (const [city, latitude, longitude, model] of DECLINATION_CHECKS) {
+  const grid = declinationAt(declinationGrid, latitude, longitude);
+  const failed = Math.abs(grid - model) > 0.5;
+  checkedDays++;
+  failedDays += failed;
+  console.log(`${failed ? "FAIL" : "ok  "} ${city.padEnd(12)} declination ${grid.toFixed(1)} (model ${model})`);
+}
+
+console.log(`\n${checkedDays - failedDays}/${checkedDays} checks passed: days within tolerance (app minus official, in minutes) or on the right day, the sun's altitude and the declination`);
 process.exitCode = failedDays ? 1 : 0;

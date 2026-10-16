@@ -70,6 +70,12 @@
       "icons": [{ "src": "shortcut-locate.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
+      "name": "اتجاه القبلة",
+      "short_name": "القبلة",
+      "url": "/?action=qibla",
+      "icons": [{ "src": "shortcut-qibla.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
       "name": "اختيار المدينة",
       "short_name": "المدينة",
       "url": "/?action=city",
